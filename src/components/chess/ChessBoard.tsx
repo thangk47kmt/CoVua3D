@@ -3,6 +3,7 @@ import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { OrbitControls, Billboard, useTexture } from "@react-three/drei";
 import { Chess } from "chess.js";
 import {
+  AdditiveBlending,
   BufferAttribute,
   BufferGeometry,
   CanvasTexture,
@@ -15,6 +16,7 @@ import {
   type Group,
   type InstancedMesh,
   type Mesh,
+  type PointLight,
   type ShaderMaterial,
 } from "three";
 import type { BoardAnim } from "@/game/notation";
@@ -176,6 +178,7 @@ function Spirits({ type, color, theme }: { type: string; color: "w" | "b"; theme
 const SPARK_VERT = `
 uniform float uTime;
 uniform float uScale;
+uniform float uSize;
 attribute float aSeed;
 void main() {
   float tw = sin(uTime * (1.2 + aSeed * 1.6) + aSeed * 6.28318);
@@ -183,7 +186,7 @@ void main() {
   p.x += sin(uTime * 0.35 + aSeed * 6.0) * 0.05;
   p.y = tw > 0.05 ? position.y + tw * 0.06 : -8.0;
   vec4 mv = modelViewMatrix * vec4(p, 1.0);
-  gl_PointSize = 0.05 * (uScale / max(1.0, -mv.z));
+  gl_PointSize = uSize * (uScale / max(1.0, -mv.z));
   gl_Position = projectionMatrix * mv;
 }
 `;
@@ -197,33 +200,46 @@ void main() {
 }
 `;
 
-function Sparkles({ color }: { color: string }) {
+function SparkField({
+  color,
+  count,
+  spread,
+  y0,
+  y1,
+  size,
+}: {
+  color: string;
+  count: number;
+  spread: number;
+  y0: number;
+  y1: number;
+  size: number;
+}) {
   const mat = useRef<ShaderMaterial>(null);
   const geom = useMemo(() => {
-    const count = 110;
     const positions = new Float32Array(count * 3);
     const seeds = new Float32Array(count);
     for (let i = 0; i < count; i += 1) {
-      positions[i * 3] = (Math.random() - 0.5) * 11;
-      positions[i * 3 + 1] = 0.35 + Math.random() * 2.8;
-      positions[i * 3 + 2] = (Math.random() - 0.5) * 11;
+      positions[i * 3] = (Math.random() - 0.5) * spread;
+      positions[i * 3 + 1] = y0 + Math.random() * (y1 - y0);
+      positions[i * 3 + 2] = (Math.random() - 0.5) * spread;
       seeds[i] = Math.random();
     }
     const geometry = new BufferGeometry();
     geometry.setAttribute("position", new BufferAttribute(positions, 3));
     geometry.setAttribute("aSeed", new BufferAttribute(seeds, 1));
     return geometry;
-  }, []);
+  }, [count, spread, y0, y1]);
   const colorRef = useRef(new Color(color));
   useEffect(() => {
     colorRef.current.set(color);
     if (mat.current) mat.current.uniforms.uColor!.value = colorRef.current;
   }, [color]);
-  useFrame(({ clock, size, viewport }) => {
+  useFrame(({ clock, size: view, viewport }) => {
     const material = mat.current;
     if (!material) return;
     material.uniforms.uTime!.value = clock.elapsedTime;
-    material.uniforms.uScale!.value = size.height * viewport.dpr * 0.5;
+    material.uniforms.uScale!.value = view.height * viewport.dpr * 0.5;
   });
   return (
     <points geometry={geom} raycast={() => null} frustumCulled={false}>
@@ -231,15 +247,30 @@ function Sparkles({ color }: { color: string }) {
         ref={mat}
         transparent
         depthWrite={false}
+        blending={AdditiveBlending}
         uniforms={{
           uTime: { value: 0 },
           uScale: { value: 400 },
+          uSize: { value: size },
           uColor: { value: colorRef.current },
         }}
         vertexShader={SPARK_VERT}
         fragmentShader={SPARK_FRAG}
       />
     </points>
+  );
+}
+
+function Sparkles({ color }: { color: string }) {
+  return <SparkField color={color} count={90} spread={11} y0={0.4} y1={2.6} size={0.09} />;
+}
+
+function BoardGlints({ color }: { color: string }) {
+  return (
+    <group>
+      <SparkField color="#ffffff" count={160} spread={7.4} y0={0.09} y1={0.22} size={0.16} />
+      <SparkField color={color} count={90} spread={7.2} y0={0.12} y1={0.55} size={0.22} />
+    </group>
   );
 }
 
@@ -514,19 +545,36 @@ function BoardFloor({ theme }: { theme: BoardTheme }) {
 }
 
 function BoardSheen({ color }: { color: string }) {
-  const ref = useRef<Mesh>(null);
+  const sweep = useRef<Mesh>(null);
+  const glow = useRef<Mesh>(null);
+  const light = useRef<PointLight>(null);
   useFrame(({ clock }) => {
-    if (!ref.current) return;
-    const t = (clock.elapsedTime * 0.12) % 1;
-    ref.current.position.x = -6 + t * 12;
-    const mat = ref.current.material as { opacity: number };
-    mat.opacity = 0.1 + Math.sin(clock.elapsedTime * 1.4) * 0.04;
+    const t = clock.elapsedTime;
+    if (sweep.current) {
+      sweep.current.position.x = -5.2 + ((t * 0.18) % 1) * 10.4;
+      const mat = sweep.current.material as { opacity: number };
+      mat.opacity = 0.22 + Math.sin(t * 1.6) * 0.08;
+    }
+    if (glow.current) {
+      const mat = glow.current.material as { opacity: number };
+      mat.opacity = 0.18 + Math.sin(t * 0.9) * 0.06;
+    }
+    if (light.current) {
+      light.current.position.set(Math.sin(t * 0.55) * 3.1, 1.35, Math.cos(t * 0.37) * 3.1);
+    }
   });
   return (
-    <mesh ref={ref} rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.07, 0]} raycast={() => null}>
-      <planeGeometry args={[1.8, 9.2]} />
-      <meshBasicMaterial color={color} transparent opacity={0.12} depthWrite={false} />
-    </mesh>
+    <group>
+      <pointLight ref={light} color={color} intensity={22} distance={8} decay={2} />
+      <mesh ref={glow} rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.045, 0]} raycast={() => null}>
+        <circleGeometry args={[3.4, 40]} />
+        <meshBasicMaterial color={color} transparent opacity={0.2} depthWrite={false} blending={AdditiveBlending} />
+      </mesh>
+      <mesh ref={sweep} rotation={[-Math.PI / 2, 0, 0.18]} position={[0, 0.08, 0]} raycast={() => null}>
+        <planeGeometry args={[1.15, 9.4]} />
+        <meshBasicMaterial color="#ffffff" transparent opacity={0.28} depthWrite={false} blending={AdditiveBlending} />
+      </mesh>
+    </group>
   );
 }
 
@@ -561,7 +609,16 @@ function SquareLayer({
   return (
     <instancedMesh ref={ref} args={[undefined, undefined, ids.length]} raycast={() => null} frustumCulled={false}>
       <planeGeometry args={[0.98, 0.98]} />
-      <meshStandardMaterial map={map} emissive={emissive} emissiveIntensity={0.28} metalness={0.62} roughness={0.14} />
+      <meshPhysicalMaterial
+        map={map}
+        color="#ffffff"
+        emissive={emissive}
+        emissiveIntensity={0.35}
+        metalness={0.25}
+        roughness={0.16}
+        clearcoat={1}
+        clearcoatRoughness={0.08}
+      />
     </instancedMesh>
   );
 }
@@ -636,6 +693,7 @@ function SquareMark({ square, flipped, color }: { square: string; flipped: boole
       )}
       {checkSquare && <CheckPulse square={checkSquare} flipped={flipped} />}
       <BoardSheen color={theme.accent} />
+      <BoardGlints color={theme.spark} />
       {(
         [
           [4.2, 4.2],

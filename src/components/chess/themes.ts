@@ -239,49 +239,59 @@ export function floorMap(theme: BoardTheme): CanvasTexture {
 }
 
 export function glassMap(theme: BoardTheme, dark: boolean): CanvasTexture {
-  const key = `v2:${theme.id}:${dark ? "d" : "l"}`;
+  const key = `v3:${theme.id}:${dark ? "d" : "l"}`;
   const cached = glassCache.get(key);
   if (cached) return cached;
   const canvas = document.createElement("canvas");
-  canvas.width = 128;
-  canvas.height = 128;
+  canvas.width = 256;
+  canvas.height = 256;
   const ctx = canvas.getContext("2d");
   if (ctx) {
-    ctx.fillStyle = dark ? theme.darkFill : theme.lightFill;
-    ctx.fillRect(0, 0, 128, 128);
-    const glow = ctx.createRadialGradient(64, 58, 2, 64, 64, 62);
-    glow.addColorStop(0, dark ? "rgba(255,255,255,0.38)" : "rgba(255,255,255,0.82)");
-    glow.addColorStop(0.45, theme.aura);
+    const base = ctx.createLinearGradient(0, 0, 256, 256);
+    base.addColorStop(0, dark ? theme.darkFill : "#ffffff");
+    base.addColorStop(0.5, dark ? theme.darkFill : theme.lightFill);
+    base.addColorStop(1, dark ? theme.base : theme.lightFill);
+    ctx.fillStyle = base;
+    ctx.fillRect(0, 0, 256, 256);
+    const glow = ctx.createRadialGradient(118, 96, 4, 128, 128, 140);
+    glow.addColorStop(0, "rgba(255,255,255,0.95)");
+    glow.addColorStop(0.22, theme.aura);
+    glow.addColorStop(0.55, dark ? "rgba(255,255,255,0.08)" : "rgba(255,255,255,0.28)");
     glow.addColorStop(1, "rgba(0,0,0,0)");
-    ctx.globalAlpha = dark ? 0.55 : 0.7;
     ctx.fillStyle = glow;
-    ctx.fillRect(0, 0, 128, 128);
-    ctx.globalAlpha = 0.22;
+    ctx.fillRect(0, 0, 256, 256);
+    ctx.strokeStyle = "rgba(255,255,255,0.55)";
+    ctx.lineWidth = 10;
+    ctx.strokeRect(8, 8, 240, 240);
+    ctx.globalAlpha = 0.35;
     ctx.strokeStyle = "#ffffff";
-    ctx.lineWidth = 14;
+    ctx.lineWidth = 18;
     ctx.beginPath();
-    ctx.moveTo(-10, 108);
-    ctx.lineTo(108, -10);
+    ctx.moveTo(-20, 210);
+    ctx.lineTo(210, -20);
     ctx.stroke();
     ctx.globalAlpha = 1;
     ctx.fillStyle = theme.accent;
-    star(ctx, 64, 64, dark ? 16 : 11);
-    ctx.globalAlpha = 0.9;
+    star(ctx, 128, 128, dark ? 28 : 18);
+    ctx.fillStyle = "#ffffff";
     ctx.beginPath();
-    ctx.arc(64, 64, dark ? 3.2 : 2.2, 0, Math.PI * 2);
+    ctx.arc(128, 128, dark ? 5 : 3.5, 0, Math.PI * 2);
     ctx.fill();
-    ctx.globalAlpha = 0.75;
-    for (const [x, y, r] of [
-      [24, 30, 1.6],
-      [98, 36, 1.3],
-      [30, 96, 1.4],
-      [100, 92, 1.8],
-      [78, 22, 1.1],
-    ] as const) {
+    for (let i = 0; i < 28; i += 1) {
+      const x = 18 + ((i * 47) % 220);
+      const y = 16 + ((i * 83) % 224);
+      const r = i % 5 === 0 ? 3.2 : 1.4;
+      ctx.globalAlpha = i % 3 === 0 ? 0.95 : 0.55;
       ctx.beginPath();
       ctx.arc(x, y, r, 0, Math.PI * 2);
       ctx.fill();
+      if (i % 4 === 0) {
+        ctx.globalAlpha = 0.7;
+        ctx.fillRect(x - 5, y - 0.6, 10, 1.2);
+        ctx.fillRect(x - 0.6, y - 5, 1.2, 10);
+      }
     }
+    ctx.globalAlpha = 1;
   }
   const tex = new CanvasTexture(canvas);
   tex.colorSpace = SRGBColorSpace;
