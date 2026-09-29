@@ -1,6 +1,6 @@
 import { Suspense, useEffect, useLayoutEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
-import { OrbitControls, Billboard, useTexture } from "@react-three/drei";
+import { OrbitControls, AdaptiveDpr, Billboard, useTexture } from "@react-three/drei";
 import { Chess } from "chess.js";
 import {
   AdditiveBlending,
@@ -139,7 +139,7 @@ function spiritMap(): CanvasTexture {
 }
 
 function Spirits({ type, color, theme }: { type: string; color: "w" | "b"; theme: BoardTheme }) {
-  const count = theme.spiritPieces.includes(type) ? (type === "k" || type === "q" ? 3 : 2) : 0;
+  const count = type === "k" || type === "q" ? 2 : 1;
   const ref = useRef<Group>(null);
   const map = useMemo(() => spiritMap(), []);
   const spin = theme.style === "dash" ? 2.4 : theme.style === "wave" ? 0.55 : theme.style === "float" ? 0.4 : 0.85;
@@ -156,7 +156,7 @@ function Spirits({ type, color, theme }: { type: string; color: "w" | "b"; theme
       child.scale.setScalar(s);
     });
   });
-  if (!count) return null;
+  if (!theme.spiritPieces.includes(type)) return null;
   const tint = color === "w" ? theme.spiritW : theme.spiritB;
   return (
     <group ref={ref}>
@@ -232,11 +232,10 @@ function SparkField({
     colorRef.current.set(color);
     if (mat.current) mat.current.uniforms.uColor!.value = colorRef.current;
   }, [color]);
-  useFrame(({ clock, size: view, viewport }) => {
+  useFrame(({ clock }) => {
     const material = mat.current;
     if (!material) return;
     material.uniforms.uTime!.value = clock.elapsedTime;
-    material.uniforms.uScale!.value = view.height * viewport.dpr * 0.5;
   });
   return (
     <points geometry={geom} raycast={() => null} frustumCulled={false}>
@@ -259,13 +258,13 @@ function SparkField({
 }
 
 function Sparkles({ color }: { color: string }) {
-  return <SparkField color={color} count={90} spread={11} y0={0.4} y1={2.6} size={0.09} />;
+  return <SparkField color={color} count={36} spread={11} y0={0.4} y1={2.6} size={0.08} />;
 }
 
 function BoardGlints({ color }: { color: string }) {
   return (
     <group>
-      <SparkField color="#ffffff" count={48} spread={7.2} y0={0.1} y1={0.28} size={0.07} />
+      <SparkField color={color} count={20} spread={7.2} y0={0.1} y1={0.28} size={0.06} />
     </group>
   );
 }
@@ -285,13 +284,8 @@ function CrystalSprite({
   const img = tex.image as { width?: number; height?: number } | undefined;
   const h = (PIECE_HEIGHT[type] ?? 1) * 1.08;
   const aspect = img?.width && img?.height ? Math.min(1.05, Math.max(0.42, img.width / img.height)) : 0.62;
-  const glow = useMemo(() => spiritMap(), []);
   return (
     <Billboard position={[0, h / 2, 0]}>
-      <mesh position={[0, 0, -0.02]} raycast={() => null}>
-        <planeGeometry args={[h * 0.72, h * 0.72]} />
-        <meshBasicMaterial map={glow} color={theme.aura} transparent opacity={0.55} depthWrite={false} toneMapped={false} />
-      </mesh>
       <mesh raycast={() => null}>
         <planeGeometry args={[h * aspect, h]} />
         <meshBasicMaterial
@@ -321,7 +315,7 @@ function StandingPiece({
   return (
     <group position={[x, 0.12, z]}>
       <mesh position={[0, 0.012, 0]} rotation={[-Math.PI / 2, 0, 0]} raycast={() => null}>
-        <circleGeometry args={[0.26, 20]} />
+        <circleGeometry args={[0.26, 8]} />
         <meshBasicMaterial color="#05030a" transparent opacity={0.38} />
       </mesh>
       <CrystalSprite color={piece.color} type={piece.type} textures={textures} theme={theme} />
@@ -364,8 +358,12 @@ function Flight({
   const fromP = squareCenter(from, flipped);
   const toP = squareCenter(to, flipped);
   const arc = piece === "n" ? theme.knightArc : theme.arc;
+  const reduceMotion = useMemo(
+    () => typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches,
+    [],
+  );
   const trail = useMemo(() => {
-    const count = 22;
+    const count = 10;
     const array = new Float32Array(count * 3);
     for (let i = 0; i < count; i += 1) {
       array[i * 3] = fromP[0];
@@ -379,8 +377,7 @@ function Flight({
 
   useFrame((state) => {
     if (!started.current) started.current = state.clock.elapsedTime;
-    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    const dur = reduce ? 0.01 : piece === "n" ? theme.knightDur : theme.dur;
+    const dur = reduceMotion ? 0.01 : piece === "n" ? theme.knightDur : theme.dur;
     const raw = Math.min(1, (state.clock.elapsedTime - started.current) / dur);
     const t = theme.style === "dash" ? raw : ease(raw);
     const lift =
@@ -600,15 +597,13 @@ function SquareLayer({
   return (
     <instancedMesh ref={ref} args={[undefined, undefined, ids.length]} raycast={() => null} frustumCulled={false}>
       <boxGeometry args={size} />
-      <meshPhysicalMaterial
+      <meshStandardMaterial
         map={map}
         color={map ? "#ffffff" : emissive}
         emissive={emissive}
         emissiveIntensity={map ? 0.08 : 0.04}
-        metalness={0.18}
-        roughness={map ? 0.28 : 0.55}
-        clearcoat={map ? 0.65 : 0.15}
-        clearcoatRoughness={0.28}
+        metalness={0.16}
+        roughness={map ? 0.38 : 0.62}
       />
     </instancedMesh>
   );
@@ -1071,9 +1066,8 @@ function Scene(
           props.theme.world === "sanguo" ? 36 : props.theme.world === "rome" ? 42 : 48,
         ]}
       />
-      <ambientLight intensity={0.55} />
-      <directionalLight position={[6, 14, 8]} intensity={1.45} color="#fff6e8" />
-      <directionalLight position={[-7, 9, -6]} intensity={0.55} color={props.theme.lightA} />
+      <ambientLight intensity={0.78} />
+      <directionalLight position={[6, 14, 8]} intensity={1.35} color="#fff6e8" />
       <pointLight position={[0, 7, 2]} intensity={10} color={props.theme.accent} distance={18} />
       <World theme={props.theme} />
       <Sparkles color={props.theme.spark} />
@@ -1132,12 +1126,13 @@ export function ChessBoard(props: ChessBoardProps) {
     <div className="crystal-host" aria-label="Bàn cờ pha lê">
       <div className="absolute inset-0">
         <Canvas
-          camera={{ position: [0, 10.2, 9.9], fov: 30, near: 0.08, far: 90 }}
-          dpr={[1, 1.15]}
-          performance={{ min: 0.65 }}
-          gl={{ antialias: true, alpha: false, powerPreference: "high-performance", stencil: false }}
+          camera={{ position: [0, 10.2, 9.9], fov: 30, near: 0.08, far: 80 }}
+          dpr={[0.8, 1.05]}
+          performance={{ min: 0.5, debounce: 200 }}
+          gl={{ antialias: false, alpha: false, powerPreference: "high-performance", stencil: false }}
           style={{ width: "100%", height: "100%", touchAction: "none" }}
         >
+          <AdaptiveDpr pixelated />
           <Suspense fallback={null}>
             <Scene {...props} cam={cam} aim={aim} theme={theme} selectedRef={selectedRef} flippedRef={flippedRef} />
           </Suspense>

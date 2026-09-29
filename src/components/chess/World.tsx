@@ -96,7 +96,7 @@ function GalaxyWorld({ theme }: { theme: BoardTheme }) {
   const dummy = useMemo(() => new Object3D(), []);
   const belt = useMemo(
     () =>
-      Array.from({ length: 30 }, () => ({
+      Array.from({ length: 14 }, () => ({
         ang: Math.random() * Math.PI * 2,
         speed: 0.02 + Math.random() * 0.035,
         radius: 12.5 + Math.random() * 6,
@@ -188,7 +188,7 @@ function GalaxyWorld({ theme }: { theme: BoardTheme }) {
 
   return (
     <group>
-      <Stars count={420} color="#d5e4ff" radius={34} />
+      <Stars count={160} color="#d5e4ff" radius={34} />
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.7, 0]} raycast={() => null}>
         <circleGeometry args={[30, 40]} />
         <meshBasicMaterial map={sky} />
@@ -196,7 +196,7 @@ function GalaxyWorld({ theme }: { theme: BoardTheme }) {
       <group ref={planets}>
         {planetPos.map((p, i) => (
           <mesh key={i} position={[p[0], p[1], p[2]]} raycast={() => null}>
-            <sphereGeometry args={[p[3], 20, 16]} />
+            <sphereGeometry args={[p[3], 12, 10]} />
             <meshStandardMaterial map={skins[i]} roughness={0.72} metalness={0.08} emissive={theme.lightB} emissiveIntensity={0.08} />
           </mesh>
         ))}
@@ -274,15 +274,15 @@ function SanguoWorld({ theme }: { theme: BoardTheme }) {
   const clouds = useRef<Group>(null);
   const seeds = useMemo(
     () =>
-      Array.from({ length: 12 }, (_, i) => {
-        const a = (i / 12) * Math.PI * 2;
+      Array.from({ length: 6 }, (_, i) => {
+        const a = (i / 6) * Math.PI * 2;
         const r = 8 + (i % 4) * 3.2;
         return { x: Math.cos(a) * r, z: Math.sin(a) * r, s: 1.6 + (i % 3) * 0.7, p: i / 12 };
       }),
     [],
   );
   const fireGeom = useMemo(() => {
-    const count = 36;
+    const count = 16;
     const array = new Float32Array(count * 3);
     for (let i = 0; i < count; i += 1) {
       const a = Math.random() * Math.PI * 2;
@@ -391,7 +391,7 @@ function SimpleWorld({ theme }: { theme: BoardTheme }) {
           </mesh>
         </group>
       )}
-      {(theme.world === "aurora" || theme.world === "shrine") && <Stars count={180} color="#e7f0ff" radius={28} />}
+      {(theme.world === "aurora" || theme.world === "shrine") && <Stars count={80} color="#e7f0ff" radius={28} />}
     </group>
   );
 }
