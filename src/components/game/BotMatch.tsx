@@ -67,11 +67,11 @@ export function BotMatch({
       setPhase("idle");
       return;
     }
-    if (move.san.includes("#") || move.san.endsWith("+")) playFx("check");
-    else if (move.isPromotion()) playFx("promote");
-    else if (move.isKingsideCastle() || move.isQueensideCastle()) playFx("castle");
-    else if (move.isCapture()) playFx("capture");
-    else playFx("move");
+    if (move.san.includes("#") || move.san.endsWith("+")) playFx("check", move.piece);
+    else if (move.isPromotion()) playFx("promote", move.promotion ?? move.piece);
+    else if (move.isKingsideCastle() || move.isQueensideCastle()) playFx("castle", move.piece);
+    else if (move.isCapture()) playFx("capture", move.piece);
+    else playFx("move", move.piece);
     const token = ++animId.current;
     settled.current = 0;
     setWaiting(false);
@@ -205,7 +205,7 @@ export function BotMatch({
     const piece = chess.get(asSquare(square));
     if (piece && piece.color === playerColor) {
       setSelected(square);
-      playFx("select");
+      playFx("select", piece.type);
     } else setSelected(null);
   }
 

@@ -244,7 +244,7 @@ export function PromotionDialog({
         <p className="mt-1 text-sm text-muted">Tốt đã tới hàng cuối. Chọn quân mới.</p>
         <div className="mt-3 grid grid-cols-2 gap-2">
           {choices.map(([piece, label]) => (
-            <button key={piece} type="button" className="btn" onClick={() => { unlockAudio(); playFx("promote"); onChoose(piece); }}>
+            <button key={piece} type="button" className="btn" onClick={() => { unlockAudio(); playFx("promote", piece); onChoose(piece); }}>
               <img src={srcForPiece(color, piece, pieces)} alt="" className="h-10 w-auto" draggable={false} /> {label}
             </button>
           ))}

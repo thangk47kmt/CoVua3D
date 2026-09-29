@@ -144,7 +144,7 @@ export function OnlineMatch({ id }: { id: string }) {
     const piece = chess.get(asSquare(square));
     if (piece && piece.color === view.youAre) {
       setSelected(square);
-      playFx("select");
+      playFx("select", piece.type);
     } else setSelected(null);
   }
 
@@ -330,9 +330,9 @@ function lastMove(sans: string[]): { from: string; to: string } | null {
 }
 
 function soundForSan(anim: BoardAnim) {
-  if (anim.rookFrom) playFx("castle");
-  else if (anim.hide.length > 1) playFx("capture");
-  else playFx("move");
+  if (anim.rookFrom) playFx("castle", anim.piece);
+  else if (anim.hide.length > 1) playFx("capture", anim.piece);
+  else playFx("move", anim.piece);
 }
 
 function finishedText(view: GameView): string {

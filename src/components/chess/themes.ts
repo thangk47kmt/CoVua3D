@@ -17,6 +17,7 @@ export type BoardTheme = {
   accent: string;
   pieceTint: string;
   pieces: PieceSetId;
+  world: "galaxy" | "rome" | "sanguo" | "shrine" | "volcano" | "sea" | "aurora";
   aura: string;
   spiritPieces: string;
   spiritW: string;
@@ -36,7 +37,7 @@ export type BoardTheme = {
 export const THEMES: BoardTheme[] = [
   {
     id: "crystal",
-    name: "Pha lê",
+    name: "Thiên hà",
     sky: "#16306e",
     fog: "#16306e",
     nebula: ["rgba(124, 64, 210, 0.55)", "rgba(40, 96, 220, 0.5)", "rgba(210, 160, 70, 0.28)"],
@@ -48,6 +49,7 @@ export const THEMES: BoardTheme[] = [
     accent: "#fff4d2",
     pieceTint: "#ffffff",
     pieces: "crystal",
+    world: "galaxy",
     aura: "#ffe7b8",
     spiritPieces: "kqn",
     spiritW: "#fff6dc",
@@ -64,6 +66,36 @@ export const THEMES: BoardTheme[] = [
     lightB: "#3d78ff",
   },
   {
+    id: "rome",
+    name: "La Mã",
+    sky: "#6e5840",
+    fog: "#6e5840",
+    nebula: ["rgba(160, 90, 40, 0.35)", "rgba(90, 60, 30, 0.3)", "rgba(230, 190, 120, 0.2)"],
+    lightFill: "#f4e7cf",
+    darkFill: "#8a6846",
+    frame: "#f3ead8",
+    base: "#4a3828",
+    spark: "#fff1d2",
+    accent: "#ffe7b0",
+    pieceTint: "#ffffff",
+    pieces: "rome",
+    world: "rome",
+    aura: "#e7d3a4",
+    spiritPieces: "kqn",
+    spiritW: "#fff4dc",
+    spiritB: "#ffb0a0",
+    trail: "#f0d8a8",
+    burst: "#ffe7c4",
+    style: "hop",
+    arc: 0.72,
+    knightArc: 1.25,
+    sway: 0.04,
+    dur: 0.62,
+    knightDur: 0.82,
+    lightA: "#e0b56a",
+    lightB: "#c47848",
+  },
+  {
     id: "anime",
     name: "Anime",
     sky: "#2a1848",
@@ -77,6 +109,7 @@ export const THEMES: BoardTheme[] = [
     accent: "#fff0c8",
     pieceTint: "#ffffff",
     pieces: "anime",
+    world: "shrine",
     aura: "#ffd0ea",
     spiritPieces: "kqn",
     spiritW: "#fff6dc",
@@ -106,6 +139,7 @@ export const THEMES: BoardTheme[] = [
     accent: "#f0d48a",
     pieceTint: "#ffffff",
     pieces: "sanguo",
+    world: "sanguo",
     aura: "#f0c56a",
     spiritPieces: "kqn",
     spiritW: "#ffe7b0",
@@ -135,6 +169,7 @@ export const THEMES: BoardTheme[] = [
     accent: "#ffe0b0",
     pieceTint: "#ffffff",
     pieces: "ember",
+    world: "volcano",
     aura: "#ff7a32",
     spiritPieces: "kqr",
     spiritW: "#ffe0a8",
@@ -164,6 +199,7 @@ export const THEMES: BoardTheme[] = [
     accent: "#ffffff",
     pieceTint: "#ffffff",
     pieces: "tide",
+    world: "sea",
     aura: "#7ee0d4",
     spiritPieces: "qbn",
     spiritW: "#e8fff8",
@@ -193,6 +229,7 @@ export const THEMES: BoardTheme[] = [
     accent: "#f6ecff",
     pieceTint: "#ffffff",
     pieces: "aurora",
+    world: "aurora",
     aura: "#8cffc8",
     spiritPieces: "kb",
     spiritW: "#e8ffe8",
@@ -239,7 +276,7 @@ export function floorMap(theme: BoardTheme): CanvasTexture {
 }
 
 export function glassMap(theme: BoardTheme, dark: boolean): CanvasTexture {
-  const key = `v3:${theme.id}:${dark ? "d" : "l"}`;
+  const key = `v4:${theme.id}:${dark ? "d" : "l"}`;
   const cached = glassCache.get(key);
   if (cached) return cached;
   const canvas = document.createElement("canvas");
@@ -247,49 +284,46 @@ export function glassMap(theme: BoardTheme, dark: boolean): CanvasTexture {
   canvas.height = 256;
   const ctx = canvas.getContext("2d");
   if (ctx) {
-    const base = ctx.createLinearGradient(0, 0, 256, 256);
-    base.addColorStop(0, dark ? theme.darkFill : "#ffffff");
-    base.addColorStop(0.5, dark ? theme.darkFill : theme.lightFill);
-    base.addColorStop(1, dark ? theme.base : theme.lightFill);
-    ctx.fillStyle = base;
+    ctx.fillStyle = dark ? theme.darkFill : theme.lightFill;
     ctx.fillRect(0, 0, 256, 256);
-    const glow = ctx.createRadialGradient(118, 96, 4, 128, 128, 140);
-    glow.addColorStop(0, "rgba(255,255,255,0.95)");
-    glow.addColorStop(0.22, theme.aura);
-    glow.addColorStop(0.55, dark ? "rgba(255,255,255,0.08)" : "rgba(255,255,255,0.28)");
-    glow.addColorStop(1, "rgba(0,0,0,0)");
-    ctx.fillStyle = glow;
+    const top = ctx.createLinearGradient(0, 0, 0, 256);
+    top.addColorStop(0, "rgba(255,255,255,0.55)");
+    top.addColorStop(0.07, "rgba(255,255,255,0)");
+    top.addColorStop(0.93, "rgba(0,0,0,0)");
+    top.addColorStop(1, "rgba(0,0,0,0.38)");
+    ctx.fillStyle = top;
     ctx.fillRect(0, 0, 256, 256);
-    ctx.strokeStyle = "rgba(255,255,255,0.55)";
-    ctx.lineWidth = 10;
-    ctx.strokeRect(8, 8, 240, 240);
-    ctx.globalAlpha = 0.35;
-    ctx.strokeStyle = "#ffffff";
-    ctx.lineWidth = 18;
-    ctx.beginPath();
-    ctx.moveTo(-20, 210);
-    ctx.lineTo(210, -20);
-    ctx.stroke();
+    const side = ctx.createLinearGradient(0, 0, 256, 0);
+    side.addColorStop(0, "rgba(255,255,255,0.28)");
+    side.addColorStop(0.08, "rgba(255,255,255,0)");
+    side.addColorStop(0.92, "rgba(0,0,0,0)");
+    side.addColorStop(1, "rgba(0,0,0,0.28)");
+    ctx.fillStyle = side;
+    ctx.fillRect(0, 0, 256, 256);
+    const glint = ctx.createRadialGradient(72, 58, 0, 72, 58, 42);
+    glint.addColorStop(0, "rgba(255,255,255,0.7)");
+    glint.addColorStop(1, "rgba(255,255,255,0)");
+    ctx.fillStyle = glint;
+    ctx.fillRect(0, 0, 256, 256);
+    ctx.globalAlpha = dark ? 0.9 : 0.45;
+    ctx.fillStyle = theme.frame;
+    star(ctx, 128, 128, 12);
     ctx.globalAlpha = 1;
-    ctx.fillStyle = theme.accent;
-    star(ctx, 128, 128, dark ? 28 : 18);
     ctx.fillStyle = "#ffffff";
     ctx.beginPath();
-    ctx.arc(128, 128, dark ? 5 : 3.5, 0, Math.PI * 2);
+    ctx.arc(128, 128, 2.2, 0, Math.PI * 2);
     ctx.fill();
-    for (let i = 0; i < 28; i += 1) {
-      const x = 18 + ((i * 47) % 220);
-      const y = 16 + ((i * 83) % 224);
-      const r = i % 5 === 0 ? 3.2 : 1.4;
-      ctx.globalAlpha = i % 3 === 0 ? 0.95 : 0.55;
+    ctx.globalAlpha = 0.8;
+    for (const [x, y, r] of [
+      [46, 40, 1.5],
+      [210, 52, 1.2],
+      [38, 200, 1.3],
+      [214, 188, 1.6],
+      [168, 36, 1.1],
+    ] as const) {
       ctx.beginPath();
       ctx.arc(x, y, r, 0, Math.PI * 2);
       ctx.fill();
-      if (i % 4 === 0) {
-        ctx.globalAlpha = 0.7;
-        ctx.fillRect(x - 5, y - 0.6, 10, 1.2);
-        ctx.fillRect(x - 0.6, y - 5, 1.2, 10);
-      }
     }
     ctx.globalAlpha = 1;
   }

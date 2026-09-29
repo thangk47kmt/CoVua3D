@@ -1,4 +1,4 @@
-import { Suspense, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { Suspense, useEffect, useLayoutEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { OrbitControls, Billboard, useTexture } from "@react-three/drei";
 import { Chess } from "chess.js";
@@ -21,8 +21,9 @@ import {
 } from "three";
 import type { BoardAnim } from "@/game/notation";
 import { pointToSquare, squareCenter } from "@/game/squares";
-import { PIECE_HEIGHT, ALL_PIECE_TEXTURES } from "./pieceArt";
+import { PIECE_HEIGHT, pieceSetMap } from "./pieceArt";
 import { THEMES, floorMap, glassMap, themeById, type BoardTheme } from "./themes";
+import { World } from "./World";
 
 export type LegalDot = { to: string; capture: boolean };
 
@@ -42,8 +43,6 @@ export type ChessBoardProps = {
 
 type Piece = { square: string; type: string; color: "w" | "b" };
 
-const PIECE_MAP = ALL_PIECE_TEXTURES;
-
 const DARK_IDS: string[] = [];
 const LIGHT_IDS: string[] = [];
 for (let rank = 0; rank < 8; rank += 1) {
@@ -53,8 +52,6 @@ for (let rank = 0; rank < 8; rank += 1) {
     else LIGHT_IDS.push(id);
   }
 }
-
-for (const url of Object.values(PIECE_MAP)) useTexture.preload(url);
 
 function piecesOf(fen: string): Piece[] {
   const chess = new Chess(fen);
@@ -268,8 +265,7 @@ function Sparkles({ color }: { color: string }) {
 function BoardGlints({ color }: { color: string }) {
   return (
     <group>
-      <SparkField color="#ffffff" count={160} spread={7.4} y0={0.09} y1={0.22} size={0.16} />
-      <SparkField color={color} count={90} spread={7.2} y0={0.12} y1={0.55} size={0.22} />
+      <SparkField color="#ffffff" count={48} spread={7.2} y0={0.1} y1={0.28} size={0.07} />
     </group>
   );
 }
@@ -285,7 +281,7 @@ function CrystalSprite({
   textures: Record<string, import("three").Texture>;
   theme: BoardTheme;
 }) {
-  const tex = textures[`${theme.pieces}-${pieceKey(color, type)}`];
+  const tex = textures[pieceKey(color, type)];
   const img = tex.image as { width?: number; height?: number } | undefined;
   const h = (PIECE_HEIGHT[type] ?? 1) * 1.08;
   const aspect = img?.width && img?.height ? Math.min(1.05, Math.max(0.42, img.width / img.height)) : 0.62;
@@ -323,8 +319,8 @@ function StandingPiece({
 }) {
   const [x, , z] = squareCenter(piece.square, flipped);
   return (
-    <group position={[x, 0, z]}>
-      <mesh position={[0, 0.045, 0]} rotation={[-Math.PI / 2, 0, 0]} raycast={() => null}>
+    <group position={[x, 0.12, z]}>
+      <mesh position={[0, 0.012, 0]} rotation={[-Math.PI / 2, 0, 0]} raycast={() => null}>
         <circleGeometry args={[0.26, 20]} />
         <meshBasicMaterial color="#05030a" transparent opacity={0.38} />
       </mesh>
@@ -399,7 +395,7 @@ function Flight({
     const z = fromP[2] + dz * t + (dx / len) * sway;
     const settle = raw > 0.78 ? Math.sin(((raw - 0.78) / 0.22) * Math.PI) * 0.1 : 0;
     if (pieceRef.current) {
-      pieceRef.current.position.set(x, lift, z);
+      pieceRef.current.position.set(x, 0.12 + lift, z);
       pieceRef.current.scale.setScalar(1 + settle);
     }
     if (ringRef.current) {
@@ -469,7 +465,7 @@ function Flight({
           <meshBasicMaterial color={i % 2 ? theme.spark : theme.trail} transparent opacity={0.9} />
         </mesh>
       ))}
-      <group ref={pieceRef} position={[fromP[0], 0, fromP[2]]}>
+      <group ref={pieceRef} position={[fromP[0], 0.12, fromP[2]]}>
         <pointLight color={theme.aura} intensity={6} distance={3.4} decay={2} />
         <CrystalSprite color={color} type={piece} textures={textures} theme={theme} />
         {theme.spiritPieces.includes(piece) && <Spirits type={piece} color={color} theme={theme} />}
@@ -487,7 +483,7 @@ function CheckPulse({ square, flipped }: { square: string; flipped: boolean }) {
     mat.opacity = 0.28 + Math.sin(state.clock.elapsedTime * 5) * 0.18;
   });
   return (
-    <mesh ref={ref} position={[x, 0.11, z]} rotation={[-Math.PI / 2, 0, 0]} raycast={() => null}>
+    <mesh ref={ref} position={[x, 0.14, z]} rotation={[-Math.PI / 2, 0, 0]} raycast={() => null}>
       <circleGeometry args={[0.46, 28]} />
       <meshBasicMaterial color="#ff5d6c" transparent opacity={0.4} depthWrite={false} />
     </mesh>
@@ -546,33 +542,24 @@ function BoardFloor({ theme }: { theme: BoardTheme }) {
 
 function BoardSheen({ color }: { color: string }) {
   const sweep = useRef<Mesh>(null);
-  const glow = useRef<Mesh>(null);
   const light = useRef<PointLight>(null);
   useFrame(({ clock }) => {
     const t = clock.elapsedTime;
     if (sweep.current) {
-      sweep.current.position.x = -5.2 + ((t * 0.18) % 1) * 10.4;
+      sweep.current.position.x = -4.6 + ((t * 0.12) % 1) * 9.2;
       const mat = sweep.current.material as { opacity: number };
-      mat.opacity = 0.22 + Math.sin(t * 1.6) * 0.08;
-    }
-    if (glow.current) {
-      const mat = glow.current.material as { opacity: number };
-      mat.opacity = 0.18 + Math.sin(t * 0.9) * 0.06;
+      mat.opacity = 0.07 + Math.sin(t * 1.2) * 0.02;
     }
     if (light.current) {
-      light.current.position.set(Math.sin(t * 0.55) * 3.1, 1.35, Math.cos(t * 0.37) * 3.1);
+      light.current.position.set(Math.sin(t * 0.4) * 2.4, 2.4, Math.cos(t * 0.28) * 2.4);
     }
   });
   return (
     <group>
-      <pointLight ref={light} color={color} intensity={22} distance={8} decay={2} />
-      <mesh ref={glow} rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.045, 0]} raycast={() => null}>
-        <circleGeometry args={[3.4, 40]} />
-        <meshBasicMaterial color={color} transparent opacity={0.2} depthWrite={false} blending={AdditiveBlending} />
-      </mesh>
-      <mesh ref={sweep} rotation={[-Math.PI / 2, 0, 0.18]} position={[0, 0.08, 0]} raycast={() => null}>
-        <planeGeometry args={[1.15, 9.4]} />
-        <meshBasicMaterial color="#ffffff" transparent opacity={0.28} depthWrite={false} blending={AdditiveBlending} />
+      <pointLight ref={light} color={color} intensity={6} distance={10} decay={2} />
+      <mesh ref={sweep} rotation={[-Math.PI / 2, 0, 0.12]} position={[0, 0.14, 0]} raycast={() => null}>
+        <planeGeometry args={[0.42, 8.6]} />
+        <meshBasicMaterial color="#ffffff" transparent opacity={0.08} depthWrite={false} blending={AdditiveBlending} />
       </mesh>
     </group>
   );
@@ -585,11 +572,15 @@ function SquareLayer({
   flipped,
   map,
   emissive,
+  y,
+  size,
 }: {
   ids: string[];
   flipped: boolean;
-  map: CanvasTexture;
+  map?: CanvasTexture;
   emissive: string;
+  y: number;
+  size: [number, number, number];
 }) {
   const ref = useRef<InstancedMesh>(null);
   const dummy = useMemo(() => new Object3D(), []);
@@ -598,35 +589,95 @@ function SquareLayer({
     if (!mesh) return;
     ids.forEach((id, index) => {
       const [x, , z] = squareCenter(id, flipped);
-      dummy.position.set(x, 0.02, z);
-      dummy.rotation.set(-Math.PI / 2, 0, 0);
+      dummy.position.set(x, y, z);
+      dummy.rotation.set(0, 0, 0);
       dummy.scale.set(1, 1, 1);
       dummy.updateMatrix();
       mesh.setMatrixAt(index, dummy.matrix);
     });
     mesh.instanceMatrix.needsUpdate = true;
-  }, [dummy, flipped, ids]);
+  }, [dummy, flipped, ids, y]);
   return (
     <instancedMesh ref={ref} args={[undefined, undefined, ids.length]} raycast={() => null} frustumCulled={false}>
-      <planeGeometry args={[0.98, 0.98]} />
+      <boxGeometry args={size} />
       <meshPhysicalMaterial
         map={map}
-        color="#ffffff"
+        color={map ? "#ffffff" : emissive}
         emissive={emissive}
-        emissiveIntensity={0.35}
-        metalness={0.25}
-        roughness={0.16}
-        clearcoat={1}
-        clearcoatRoughness={0.08}
+        emissiveIntensity={map ? 0.08 : 0.04}
+        metalness={0.18}
+        roughness={map ? 0.28 : 0.55}
+        clearcoat={map ? 0.65 : 0.15}
+        clearcoatRoughness={0.28}
       />
     </instancedMesh>
+  );
+}
+
+function BoardFrame({ theme }: { theme: BoardTheme }) {
+  const sides = [
+    [0, 4.88, 10.2, 0.58],
+    [0, -4.88, 10.2, 0.58],
+    [4.88, 0, 0.58, 10.2],
+    [-4.88, 0, 0.58, 10.2],
+  ] as const;
+  return (
+    <group>
+      <mesh position={[0, -0.46, 0]} raycast={() => null}>
+        <boxGeometry args={[10.7, 0.34, 10.7]} />
+        <meshStandardMaterial color={theme.base} metalness={0.42} roughness={0.46} />
+      </mesh>
+      <mesh position={[0, -0.22, 0]} raycast={() => null}>
+        <boxGeometry args={[10.05, 0.14, 10.05]} />
+        <meshStandardMaterial color={theme.base} metalness={0.25} roughness={0.58} />
+      </mesh>
+      <mesh position={[0, -0.04, 0]} raycast={() => null}>
+        <boxGeometry args={[8.2, 0.05, 8.2]} />
+        <meshStandardMaterial color="#07060c" roughness={0.92} metalness={0.05} />
+      </mesh>
+      {sides.map(([x, z, w, d]) => {
+        const capW = w > d ? w * 0.92 : Math.max(0.16, w * 0.42);
+        const capD = d > w ? d * 0.92 : Math.max(0.16, d * 0.42);
+        return (
+        <group key={`${x}:${z}`}>
+          <mesh position={[x, 0.02, z]} raycast={() => null}>
+            <boxGeometry args={[w, 0.26, d]} />
+            <meshStandardMaterial color={theme.frame} metalness={0.84} roughness={0.22} emissive={theme.frame} emissiveIntensity={0.1} />
+          </mesh>
+          <mesh position={[x * 0.955, 0.18, z * 0.955]} raycast={() => null}>
+            <boxGeometry args={[capW, 0.055, capD]} />
+            <meshStandardMaterial color={theme.accent} metalness={0.62} roughness={0.16} emissive={theme.accent} emissiveIntensity={0.42} />
+          </mesh>
+        </group>
+        );
+      })}
+      {(
+        [
+          [4.55, 4.55],
+          [4.55, -4.55],
+          [-4.55, 4.55],
+          [-4.55, -4.55],
+        ] as const
+      ).map(([x, z]) => (
+        <group key={`${x}${z}`} position={[x, 0, z]}>
+          <mesh position={[0, 0.22, 0]} raycast={() => null}>
+            <boxGeometry args={[0.42, 0.5, 0.42]} />
+            <meshStandardMaterial color={theme.frame} metalness={0.88} roughness={0.18} emissive={theme.frame} emissiveIntensity={0.16} />
+          </mesh>
+          <mesh position={[0, 0.52, 0]} raycast={() => null}>
+            <octahedronGeometry args={[0.12, 0]} />
+            <meshStandardMaterial color={theme.accent} emissive={theme.accent} emissiveIntensity={0.85} metalness={0.3} roughness={0.15} />
+          </mesh>
+        </group>
+      ))}
+    </group>
   );
 }
 
 function SquareMark({ square, flipped, color }: { square: string; flipped: boolean; color: string }) {
   const [x, , z] = squareCenter(square, flipped);
   return (
-    <mesh position={[x, 0.035, z]} rotation={[-Math.PI / 2, 0, 0]} raycast={() => null}>
+    <mesh position={[x, 0.13, z]} rotation={[-Math.PI / 2, 0, 0]} raycast={() => null}>
       <planeGeometry args={[0.98, 0.98]} />
       <meshBasicMaterial color={color} transparent opacity={0.34} depthWrite={false} />
     </mesh>
@@ -665,25 +716,11 @@ function SquareMark({ square, flipped, color }: { square: string; flipped: boole
 
   return (
     <group>
-      <mesh position={[0, -0.32, 0]} receiveShadow>
-        <boxGeometry args={[9.55, 0.58, 9.55]} />
-        <meshStandardMaterial color={theme.base} metalness={0.55} roughness={0.38} />
-      </mesh>
-      {(
-        [
-          [0, 0.16, 4.62, 9.35, 0.28, 0.38],
-          [0, 0.16, -4.62, 9.35, 0.28, 0.38],
-          [4.62, 0.16, 0, 0.38, 0.28, 8.9],
-          [-4.62, 0.16, 0, 0.38, 0.28, 8.9],
-        ] as const
-      ).map((bar) => (
-        <mesh key={bar.join()} position={[bar[0], bar[1], bar[2]]}>
-          <boxGeometry args={[bar[3], bar[4], bar[5]]} />
-          <meshStandardMaterial color={theme.frame} metalness={0.9} roughness={0.2} emissive={theme.frame} emissiveIntensity={0.18} />
-        </mesh>
-      ))}
-      <SquareLayer ids={LIGHT_IDS} flipped={flipped} map={maps.light} emissive={theme.lightFill} />
-      <SquareLayer ids={DARK_IDS} flipped={flipped} map={maps.dark} emissive={theme.darkFill} />
+      <BoardFrame theme={theme} />
+      <SquareLayer ids={LIGHT_IDS} flipped={flipped} emissive={theme.base} y={0.045} size={[0.94, 0.08, 0.94]} />
+      <SquareLayer ids={DARK_IDS} flipped={flipped} emissive={theme.base} y={0.045} size={[0.94, 0.08, 0.94]} />
+      <SquareLayer ids={LIGHT_IDS} flipped={flipped} map={maps.light} emissive={theme.lightFill} y={0.1} size={[0.78, 0.035, 0.78]} />
+      <SquareLayer ids={DARK_IDS} flipped={flipped} map={maps.dark} emissive={theme.darkFill} y={0.1} size={[0.78, 0.035, 0.78]} />
       {selected && <SquareMark square={selected} flipped={flipped} color={theme.frame} />}
       {lastMove && lastMove.from !== selected && (
         <SquareMark square={lastMove.from} flipped={flipped} color={theme.accent} />
@@ -692,27 +729,8 @@ function SquareMark({ square, flipped, color }: { square: string; flipped: boole
         <SquareMark square={lastMove.to} flipped={flipped} color={theme.accent} />
       )}
       {checkSquare && <CheckPulse square={checkSquare} flipped={flipped} />}
-      <BoardSheen color={theme.accent} />
+      <BoardSheen color="#d7e6ff" />
       <BoardGlints color={theme.spark} />
-      {(
-        [
-          [4.2, 4.2],
-          [4.2, -4.2],
-          [-4.2, 4.2],
-          [-4.2, -4.2],
-        ] as const
-      ).map(([x, z]) => (
-        <group key={`${x}${z}`} position={[x, 0.14, z]}>
-          <mesh rotation={[-Math.PI / 2, 0, 0]} raycast={() => null}>
-            <ringGeometry args={[0.18, 0.3, 6]} />
-            <meshStandardMaterial color={theme.frame} metalness={0.9} roughness={0.18} emissive={theme.frame} emissiveIntensity={0.3} />
-          </mesh>
-          <mesh position={[0, 0.06, 0]} raycast={() => null}>
-            <octahedronGeometry args={[0.09, 0]} />
-            <meshStandardMaterial color={theme.accent} emissive={theme.accent} emissiveIntensity={0.7} metalness={0.35} roughness={0.2} />
-          </mesh>
-        </group>
-      ))}
       {[...legal.values()].map((dot) => {
         const [x, , z] = squareCenter(dot.to, flipped);
         return dot.capture ? (
@@ -729,7 +747,7 @@ function SquareMark({ square, flipped, color }: { square: string; flipped: boole
       })}
       <mesh
         rotation={[-Math.PI / 2, 0, 0]}
-        position={[0, 0.2, 0]}
+        position={[0, 0.16, 0]}
         onClick={(event) => {
           event.stopPropagation();
           remember(event.point.x, event.point.z);
@@ -756,7 +774,7 @@ function SquareMark({ square, flipped, color }: { square: string; flipped: boole
         return (
           <mesh
             key={letter}
-            position={[x, 0.18, flipped ? -4.72 : 4.72]}
+            position={[x, 0.24, flipped ? -4.42 : 4.42]}
             rotation={[-Math.PI / 2, 0, flipped ? Math.PI : 0]}
           >
             <planeGeometry args={[0.46, 0.46]} />
@@ -769,7 +787,7 @@ function SquareMark({ square, flipped, color }: { square: string; flipped: boole
         return (
           <mesh
             key={rank}
-            position={[flipped ? 4.72 : -4.72, 0.18, z]}
+            position={[flipped ? 4.42 : -4.42, 0.24, z]}
             rotation={[-Math.PI / 2, 0, flipped ? Math.PI : 0]}
           >
             <planeGeometry args={[0.46, 0.46]} />
@@ -783,6 +801,7 @@ function SquareMark({ square, flipped, color }: { square: string; flipped: boole
 
 type CamApi = {
   zoom: (dir: "in" | "out", factor?: number) => void;
+  pan: (dir: "up" | "down" | "left" | "right") => void;
   reset: () => void;
 };
 
@@ -828,17 +847,13 @@ function Rig({
     target: { x: number; y: number; z: number; set: (x: number, y: number, z: number) => void };
     update: () => void;
   } | null;
-  useEffect(() => {
+  useLayoutEffect(() => {
     const place = () => {
       const aspect = size.width / Math.max(1, size.height);
-      const tight = size.height < 560 || aspect < 0.95;
-      const dist = tight ? 18.5 : aspect > 1.65 ? 15.2 : 13.4;
-      const lift = tight ? 0.58 : 0.52;
-      const y = dist * lift;
-      const horizontal = dist * Math.sqrt(Math.max(0.2, 1 - lift * lift));
-      camera.position.set(0, y, (flipped ? -1 : 1) * horizontal);
-      camera.lookAt(0, 0.2, 0);
-      controls?.target.set(0, 0.2, 0);
+      const dist = aspect < 0.95 ? 16.2 : aspect > 1.55 ? 13.2 : 14.2;
+      camera.position.set(0, dist * 0.72, (flipped ? -1 : 1) * dist * 0.7);
+      camera.lookAt(0, 0, 0);
+      controls?.target.set(0, 0, 0);
       controls?.update();
     };
     const retarget = () => {
@@ -874,11 +889,34 @@ function Rig({
       controls.update();
     };
     place();
+    const frame = requestAnimationFrame(place);
     cam.current.zoom = (dir, factor) => {
       retarget();
       dolly(factor ?? (dir === "in" ? 0.62 : 1.62));
     };
     cam.current.reset = place;
+    cam.current.pan = (dir) => {
+      if (!controls) return;
+      const forward = new Vector3();
+      const right = new Vector3();
+      camera.getWorldDirection(forward);
+      forward.y = 0;
+      if (forward.lengthSq() < 1e-6) forward.set(0, 0, flipped ? 1 : -1);
+      forward.normalize();
+      right.crossVectors(forward, new Vector3(0, 1, 0)).normalize();
+      const step = 0.42;
+      const move =
+        dir === "up" ? forward : dir === "down" ? forward.clone().multiplyScalar(-1) : dir === "right" ? right : right.clone().multiplyScalar(-1);
+      const nx = Math.max(-6, Math.min(6, controls.target.x + move.x * step));
+      const nz = Math.max(-6, Math.min(6, controls.target.z + move.z * step));
+      const dx = nx - controls.target.x;
+      const dz = nz - controls.target.z;
+      controls.target.x += dx;
+      controls.target.z += dz;
+      camera.position.x += dx;
+      camera.position.z += dz;
+      controls.update();
+    };
 
     const el = gl.domElement;
     const pointers = new Map<number, { x: number; y: number }>();
@@ -920,6 +958,7 @@ function Rig({
     el.addEventListener("pointerup", onUp);
     el.addEventListener("pointercancel", onUp);
     return () => {
+      cancelAnimationFrame(frame);
       el.removeEventListener("wheel", onWheel, true);
       el.removeEventListener("pointerdown", onDown);
       el.removeEventListener("pointermove", onMove);
@@ -930,6 +969,7 @@ function Rig({
   return (
     <OrbitControls
       makeDefault
+      target={[0, 0, 0]}
       enablePan={false}
       enableZoom={false}
       minPolarAngle={0.4}
@@ -944,64 +984,21 @@ function Rig({
   );
 }
 
-function Scene(
-  props: ChessBoardProps & {
-    cam: { current: CamApi };
-    aim: { current: Aim };
-    theme: BoardTheme;
-    selectedRef: { current: string | null };
-    flippedRef: { current: boolean };
-  },
+function Pieces(
+  props: ChessBoardProps & { theme: BoardTheme },
 ) {
-  const textures = useTexture(PIECE_MAP);
+  const textures = useTexture(pieceSetMap(props.theme.pieces));
   useEffect(() => {
     for (const tex of Object.values(textures)) {
       tex.colorSpace = SRGBColorSpace;
-      tex.anisotropy = 8;
+      tex.anisotropy = 4;
     }
   }, [textures]);
   const hidden = new Set(props.anim?.hide ?? []);
   const pieces = useMemo(() => piecesOf(props.fen), [props.fen]);
-  const legal = useMemo(() => {
-    const map = new Map<string, LegalDot>();
-    for (const dot of props.legal) map.set(dot.to, dot);
-    return map;
-  }, [props.legal]);
   const capture = Boolean(props.anim && props.anim.hide.includes(props.anim.to));
-  props.selectedRef.current = props.selected;
-  props.flippedRef.current = props.flipped;
-
   return (
     <>
-      <color attach="background" args={[props.theme.sky]} />
-      <fog attach="fog" args={[props.theme.fog, 18, 46]} />
-      <ambientLight intensity={0.72} />
-      <directionalLight position={[5, 12, 6]} intensity={1.55} color={props.theme.accent} />
-      <pointLight position={[-6, 4, -3]} intensity={18} color={props.theme.lightA} distance={22} />
-      <pointLight position={[6, 3, 5]} intensity={12} color={props.theme.lightB} distance={18} />
-      <Galaxy theme={props.theme} />
-      <BoardFloor theme={props.theme} />
-      <Sparkles color={props.theme.spark} />
-      <PointerFocus aim={props.aim} />
-      <Rig
-        flipped={props.flipped}
-        autoRotate={props.autoRotate}
-        cam={props.cam}
-        aim={props.aim}
-        selectedRef={props.selectedRef}
-        flippedRef={props.flippedRef}
-      />
-      <BoardMesh
-        flipped={props.flipped}
-        selected={props.selected}
-        legal={legal}
-        lastMove={props.lastMove}
-        checkSquare={props.checkSquare}
-        interactive={props.interactive}
-        onSquare={props.onSquare}
-        theme={props.theme}
-        aim={props.aim}
-      />
       {pieces.map((piece) => {
         if (hidden.has(piece.square)) return null;
         return (
@@ -1046,9 +1043,71 @@ function Scene(
   );
 }
 
+function Scene(
+  props: ChessBoardProps & {
+    cam: { current: CamApi };
+    aim: { current: Aim };
+    theme: BoardTheme;
+    selectedRef: { current: string | null };
+    flippedRef: { current: boolean };
+  },
+) {
+  const legal = useMemo(() => {
+    const map = new Map<string, LegalDot>();
+    for (const dot of props.legal) map.set(dot.to, dot);
+    return map;
+  }, [props.legal]);
+  props.selectedRef.current = props.selected;
+  props.flippedRef.current = props.flipped;
+
+  return (
+    <>
+      <color attach="background" args={[props.theme.sky]} />
+      <fog
+        attach="fog"
+        args={[
+          props.theme.fog,
+          props.theme.world === "sanguo" ? 12 : props.theme.world === "rome" ? 15 : 18,
+          props.theme.world === "sanguo" ? 36 : props.theme.world === "rome" ? 42 : 48,
+        ]}
+      />
+      <ambientLight intensity={0.55} />
+      <directionalLight position={[6, 14, 8]} intensity={1.45} color="#fff6e8" />
+      <directionalLight position={[-7, 9, -6]} intensity={0.55} color={props.theme.lightA} />
+      <pointLight position={[0, 7, 2]} intensity={10} color={props.theme.accent} distance={18} />
+      <World theme={props.theme} />
+      <Sparkles color={props.theme.spark} />
+      <PointerFocus aim={props.aim} />
+      <Rig
+        flipped={props.flipped}
+        autoRotate={props.autoRotate}
+        cam={props.cam}
+        aim={props.aim}
+        selectedRef={props.selectedRef}
+        flippedRef={props.flippedRef}
+      />
+      <BoardMesh
+        flipped={props.flipped}
+        selected={props.selected}
+        legal={legal}
+        lastMove={props.lastMove}
+        checkSquare={props.checkSquare}
+        interactive={props.interactive}
+        onSquare={props.onSquare}
+        theme={props.theme}
+        aim={props.aim}
+      />
+      <Suspense fallback={null}>
+        <Pieces {...props} theme={props.theme} />
+      </Suspense>
+    </>
+  );
+}
+
 export function ChessBoard(props: ChessBoardProps) {
   const cam = useRef<CamApi>({
     zoom() {},
+    pan() {},
     reset() {},
   });
   const aim = useRef<Aim>({ x: 0, z: 0, has: false });
@@ -1073,8 +1132,8 @@ export function ChessBoard(props: ChessBoardProps) {
     <div className="crystal-host" aria-label="Bàn cờ pha lê">
       <div className="absolute inset-0">
         <Canvas
-          camera={{ position: [0, 6.5, 11.2], fov: 32, near: 0.08, far: 90 }}
-          dpr={[1, 1.35]}
+          camera={{ position: [0, 10.2, 9.9], fov: 30, near: 0.08, far: 90 }}
+          dpr={[1, 1.15]}
           performance={{ min: 0.65 }}
           gl={{ antialias: true, alpha: false, powerPreference: "high-performance", stencil: false }}
           style={{ width: "100%", height: "100%", touchAction: "none" }}
@@ -1084,15 +1143,57 @@ export function ChessBoard(props: ChessBoardProps) {
           </Suspense>
         </Canvas>
       </div>
-      <div className="absolute top-2 right-2 z-10 flex gap-1">
-        <button type="button" className="btn h-9 min-h-0 w-9 px-0" onClick={() => cam.current.zoom("in")} aria-label="Phóng gần">
+      <CameraPad cam={cam} />
+    </div>
+  );
+}
+
+function CameraPad({ cam }: { cam: { current: CamApi } }) {
+  const timer = useRef<number | null>(null);
+  const stop = () => {
+    if (timer.current !== null) {
+      window.clearInterval(timer.current);
+      timer.current = null;
+    }
+  };
+  useEffect(() => stop, []);
+  const hold = (event: ReactPointerEvent<HTMLButtonElement>, dir: "up" | "down" | "left" | "right") => {
+    event.preventDefault();
+    event.currentTarget.setPointerCapture(event.pointerId);
+    cam.current.pan(dir);
+    stop();
+    timer.current = window.setInterval(() => cam.current.pan(dir), 70);
+  };
+  const key = "btn h-9 min-h-0 w-9 px-0 text-base leading-none";
+  return (
+    <div className="absolute top-2 right-2 z-10 flex flex-col items-end gap-1">
+      <div className="grid grid-cols-3 gap-1" onPointerUp={stop} onPointerCancel={stop} onPointerLeave={stop}>
+        <span />
+        <button type="button" className={key} aria-label="Đưa camera lên" onPointerDown={(event) => hold(event, "up")}>
+          ↑
+        </button>
+        <span />
+        <button type="button" className={key} aria-label="Đưa camera sang trái" onPointerDown={(event) => hold(event, "left")}>
+          ←
+        </button>
+        <button type="button" className={key} aria-label="Camera về giữa bàn cờ" onClick={() => cam.current.reset()}>
+          ■
+        </button>
+        <button type="button" className={key} aria-label="Đưa camera sang phải" onPointerDown={(event) => hold(event, "right")}>
+          →
+        </button>
+        <span />
+        <button type="button" className={key} aria-label="Đưa camera xuống" onPointerDown={(event) => hold(event, "down")}>
+          ↓
+        </button>
+        <span />
+      </div>
+      <div className="flex gap-1">
+        <button type="button" className={key} onClick={() => cam.current.zoom("in")} aria-label="Phóng gần">
           +
         </button>
-        <button type="button" className="btn h-9 min-h-0 w-9 px-0" onClick={() => cam.current.zoom("out")} aria-label="Thu xa">
+        <button type="button" className={key} onClick={() => cam.current.zoom("out")} aria-label="Thu xa">
           −
-        </button>
-        <button type="button" className="btn h-9 min-h-0 px-2 text-xs" onClick={() => cam.current.reset()}>
-          Góc
         </button>
       </div>
     </div>
