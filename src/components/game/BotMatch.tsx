@@ -47,7 +47,9 @@ export function BotMatch({
   const [confirmResign, setConfirmResign] = useState(false);
   const [manual, setManual] = useState<string | null>(null);
   const [waiting, setWaiting] = useState(false);
+  const [hint, setHint] = useState<string | null>(null);
   const req = useRef(0);
+  const hintId = useRef(0);
   const animId = useRef(1);
   const workerRef = useRef<Worker | null>(null);
   const timerRef = useRef<number | null>(null);
@@ -78,6 +80,7 @@ export function BotMatch({
     setAnim(animFromMove(move, token));
     setLastMove({ from: move.from, to: move.to });
     setSelected(null);
+    setHint(null);
     setPromo(null);
     setSans(chess.history());
     setPhase("animating");
@@ -118,7 +121,19 @@ export function BotMatch({
     const worker = new Worker(new URL("../../game/engine.worker.ts", import.meta.url), { type: "module" });
     workerRef.current = worker;
     const onMessage = (event: MessageEvent<{ id: number; move: EngineMove | null }>) => {
-      if (!event.data || event.data.id !== req.current) return;
+      if (!event.data) return;
+      if (event.data.id < 0) {
+        if (event.data.id !== -hintId.current) return;
+        const move = event.data.move;
+        if (!move) {
+          setHint("Không có nước gợi ý.");
+          return;
+        }
+        setHint(`Gợi ý: ${move.san}. Chạm quân rồi đi nước đó.`);
+        setSelected(move.from);
+        return;
+      }
+      if (event.data.id !== req.current) return;
       req.current += 1;
       if (timerRef.current) window.clearTimeout(timerRef.current);
       const move = event.data.move;
@@ -170,7 +185,7 @@ export function BotMatch({
 
   useEffect(() => {
     if (phase !== "animating") return;
-    const timer = window.setTimeout(() => finishRef.current(), 520);
+    const timer = window.setTimeout(() => finishRef.current(), 1400);
     return () => window.clearTimeout(timer);
   }, [phase, anim?.id]);
 
@@ -207,6 +222,24 @@ export function BotMatch({
       setSelected(square);
       playFx("select", piece.type);
     } else setSelected(null);
+  }
+
+  function playNow() {
+    const chess = chessRef.current;
+    const worker = workerRef.current;
+    if (!chess || !worker || !waiting) return;
+    const id = ++req.current;
+    if (timerRef.current) window.clearTimeout(timerRef.current);
+    worker.postMessage({ id, fen: chess.fen(), movetime: 70, noise: level.noise, depthCap: 1 });
+  }
+
+  function askHint() {
+    const chess = chessRef.current;
+    const worker = workerRef.current;
+    if (!chess || !worker || phase !== "idle" || chess.turn() !== playerColor || chess.isGameOver()) return;
+    const id = ++hintId.current;
+    setHint("Đang chọn nước gợi ý…");
+    worker.postMessage({ id: -id, fen: chess.fen(), movetime: 180, noise: 0, depthCap: 2 });
   }
 
   function undo() {
@@ -254,7 +287,7 @@ export function BotMatch({
           onClick: () => onSquare(dot.to),
         }));
 
-  const status = manual ?? (waiting ? "Tinh tú đang nghĩ…" : liveReport.text);
+  const status = manual ?? (waiting ? "Tinh tú đang nghĩ…" : (hint ?? liveReport.text));
 
   return (
     <div className="grid h-dvh min-w-0 grid-cols-[minmax(0,1fr)] grid-rows-[auto_minmax(0,1fr)_auto] overflow-hidden lg:grid-cols-[minmax(0,1fr)_22rem] lg:grid-rows-[auto_minmax(0,1fr)]">
@@ -325,6 +358,8 @@ export function BotMatch({
         thinking={waiting}
         onFlip={() => setFlipped((value) => !value)}
         onUndo={undo}
+        onHint={phase === "over" ? undefined : askHint}
+        onPlayNow={playNow}
         onResign={phase === "over" ? undefined : () => setConfirmResign(true)}
       >
         <MoveHelper buttons={helper} />

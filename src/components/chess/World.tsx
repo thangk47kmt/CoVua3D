@@ -17,6 +17,7 @@ import {
   type Points,
 } from "three";
 import type { BoardTheme } from "./themes";
+import { effectsPaused } from "@/game/view";
 
 function bands(colors: string[]): CanvasTexture {
   const canvas = document.createElement("canvas");
@@ -171,6 +172,7 @@ function RisingSmoke({
 }) {
   const groups = useRef<(Group | null)[]>([]);
   useFrame(() => {
+    if (effectsPaused()) return;
     const t = performance.now() / 1000;
     seeds.forEach((seed, i) => {
       const node = groups.current[i];
@@ -242,6 +244,7 @@ function WarBelow({
   }, []);
   const flicker = useRef<Points>(null);
   useFrame(() => {
+    if (effectsPaused()) return;
     const mat = flicker.current?.material as { size?: number; opacity?: number } | undefined;
     if (!mat) return;
     const t = performance.now() / 1000;
@@ -340,6 +343,7 @@ function GalaxyWorld({ theme }: { theme: BoardTheme }) {
   );
 
   useFrame((_, delta) => {
+    if (effectsPaused()) return;
     const t = performance.now() / 1000;
     planets.current?.children.forEach((child, i) => {
       child.rotation.y += delta * (0.05 + i * 0.015);
@@ -397,8 +401,8 @@ function GalaxyWorld({ theme }: { theme: BoardTheme }) {
 
   return (
     <group>
-      <Stars count={460} color="#e7f1ff" radius={58} />
-      <Stars count={70} color="#ffe3a4" radius={46} />
+      <Stars count={180} color="#e7f1ff" radius={58} />
+      <Stars count={28} color="#ffe3a4" radius={46} />
       <mesh raycast={() => null}>
         <sphereGeometry args={[90, 48, 32]} />
         <meshBasicMaterial map={sky} side={BackSide} />

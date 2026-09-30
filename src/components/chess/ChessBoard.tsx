@@ -1,7 +1,7 @@
 import { Suspense, useEffect, useLayoutEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import { BoardSplash } from "./ClientBoard";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
-import { OrbitControls, Billboard, useTexture } from "@react-three/drei";
+import { OrbitControls, Billboard } from "@react-three/drei";
 import { Chess } from "chess.js";
 import {
   AdditiveBlending,
@@ -14,6 +14,7 @@ import {
   Plane,
   SRGBColorSpace,
   LinearFilter,
+  TextureLoader,
   Vector3,
   type Group,
   type InstancedMesh,
@@ -26,6 +27,7 @@ import { pointToSquare, squareCenter } from "@/game/squares";
 import { PIECE_HEIGHT, pieceSetMap } from "./pieceArt";
 import { applyTint, floorMap, glassMap, readSavedTheme, readSavedTint, themeById, type BoardTheme } from "./themes";
 import { World } from "./World";
+import { effectsPaused, setBoardOnScreen } from "@/game/view";
 
 export type LegalDot = { to: string; capture: boolean };
 
@@ -146,6 +148,7 @@ function Spirits({ type, color, theme }: { type: string; color: "w" | "b"; theme
   const map = useMemo(() => spiritMap(), []);
   const spin = theme.style === "dash" ? 2.4 : theme.style === "wave" ? 0.55 : theme.style === "float" ? 0.4 : 0.85;
   useFrame(({ clock }) => {
+    if (effectsPaused()) return;
     const group = ref.current;
     if (!group) return;
     const t = clock.elapsedTime;
@@ -243,6 +246,7 @@ function SparkField({
     if (mat.current) mat.current.uniforms.uColor!.value = colorRef.current;
   }, [color]);
   useFrame(({ clock }) => {
+    if (effectsPaused()) return;
     const material = mat.current;
     if (!material) return;
     material.uniforms.uTime!.value = clock.elapsedTime;
@@ -268,24 +272,25 @@ function SparkField({
 }
 
 function Sparkles({ color }: { color: string }) {
-  return <SparkField color={color} count={84} spread={14} y0={0.5} y1={4.2} size={0.13} />;
+  return <SparkField color={color} count={32} spread={12} y0={0.5} y1={3.4} size={0.11} />;
 }
 
 function BoardGlints({ color }: { color: string }) {
-  return <SparkField color={color} count={56} spread={8.4} y0={0.16} y1={0.55} size={0.11} />;
+  return <SparkField color={color} count={18} spread={8} y0={0.16} y1={0.42} size={0.09} />;
 }
 
 function RimShimmer({ color }: { color: string }) {
   const ref = useRef<Group>(null);
   const gems = useMemo(
     () =>
-      Array.from({ length: 18 }, (_, i) => {
-        const a = (i / 18) * Math.PI * 2;
+      Array.from({ length: 8 }, (_, i) => {
+        const a = (i / 8) * Math.PI * 2;
         return [Math.cos(a) * 5.2, 0.32, Math.sin(a) * 5.2] as const;
       }),
     [],
   );
   useFrame(({ clock }) => {
+    if (effectsPaused()) return;
     const group = ref.current;
     if (!group) return;
     group.rotation.y = clock.elapsedTime * 0.18;
@@ -500,7 +505,6 @@ function Flight({
         </mesh>
       ))}
       <group ref={pieceRef} position={[fromP[0], 0.12, fromP[2]]}>
-        <pointLight color={theme.aura} intensity={6} distance={3.4} decay={2} />
         <CrystalSprite color={color} type={piece} textures={textures} theme={theme} />
         {theme.spiritPieces.includes(piece) && <Spirits type={piece} color={color} theme={theme} />}
       </group>
@@ -578,6 +582,7 @@ function BoardSheen({ color }: { color: string }) {
   const sweep = useRef<Mesh>(null);
   const light = useRef<PointLight>(null);
   useFrame(({ clock }) => {
+    if (effectsPaused()) return;
     const t = clock.elapsedTime;
     if (sweep.current) {
       sweep.current.position.x = -4.6 + ((t * 0.22) % 1) * 9.2;
@@ -917,6 +922,8 @@ function Rig({
     target: { x: number; y: number; z: number; set: (x: number, y: number, z: number) => void };
     update: () => void;
   } | null;
+  const placed = useRef(false);
+  const seenFlip = useRef(flipped);
   useLayoutEffect(() => {
     const place = () => {
       const aspect = size.width / Math.max(1, size.height);
@@ -958,8 +965,14 @@ function Rig({
       camera.position.set(controls.target.x + ox * scale, controls.target.y + oy * scale, controls.target.z + oz * scale);
       controls.update();
     };
-    place();
-    const frame = requestAnimationFrame(place);
+    const flipChanged = seenFlip.current !== flipped;
+    seenFlip.current = flipped;
+    let frame = 0;
+    if (!placed.current || flipChanged) {
+      place();
+      frame = requestAnimationFrame(place);
+      if (size.width > 0 && size.height > 0 && controls) placed.current = true;
+    }
     cam.current.zoom = (dir, factor) => {
       retarget();
       dolly(factor ?? (dir === "in" ? 0.62 : 1.62));
@@ -1028,7 +1041,7 @@ function Rig({
     el.addEventListener("pointerup", onUp);
     el.addEventListener("pointercancel", onUp);
     return () => {
-      cancelAnimationFrame(frame);
+      if (frame) cancelAnimationFrame(frame);
       el.removeEventListener("wheel", onWheel, true);
       el.removeEventListener("pointerdown", onDown);
       el.removeEventListener("pointermove", onMove);
@@ -1054,25 +1067,46 @@ function Rig({
   );
 }
 
-function Pieces(
-  props: ChessBoardProps & { theme: BoardTheme },
-) {
+function Pieces(props: ChessBoardProps & { theme: BoardTheme; onReady?: () => void }) {
   const gl = useThree((s) => s.gl);
-  const textures = useTexture(pieceSetMap(props.theme.pieces));
+  const setId = props.theme.pieces;
+  const [textures, setTextures] = useState<Record<string, import("three").Texture> | null>(null);
   useEffect(() => {
-    const anisotropy = gl.capabilities.getMaxAnisotropy();
-    for (const tex of Object.values(textures)) {
-      tex.colorSpace = SRGBColorSpace;
-      tex.magFilter = LinearFilter;
-      tex.minFilter = LinearFilter;
-      tex.generateMipmaps = false;
-      tex.anisotropy = anisotropy;
-      tex.needsUpdate = true;
-    }
-  }, [gl, textures]);
+    let cancel = false;
+    const loader = new TextureLoader();
+    const entries = Object.entries(pieceSetMap(setId));
+    void Promise.all(entries.map(([key, url]) => loader.loadAsync(url).then((tex) => [key, tex] as const))).then((pairs) => {
+      if (cancel) {
+        for (const [, tex] of pairs) tex.dispose();
+        return;
+      }
+      const anisotropy = gl.capabilities.getMaxAnisotropy();
+      const next: Record<string, import("three").Texture> = {};
+      for (const [key, tex] of pairs) {
+        tex.colorSpace = SRGBColorSpace;
+        tex.magFilter = LinearFilter;
+        tex.minFilter = LinearFilter;
+        tex.generateMipmaps = false;
+        tex.anisotropy = anisotropy;
+        tex.needsUpdate = true;
+        next[key] = tex;
+      }
+      setTextures((prev) => {
+        if (prev) for (const tex of Object.values(prev)) tex.dispose();
+        return next;
+      });
+    });
+    return () => {
+      cancel = true;
+    };
+  }, [gl, setId]);
+  useEffect(() => {
+    if (textures) props.onReady?.();
+  }, [textures, props.onReady]);
   const hidden = new Set(props.anim?.hide ?? []);
   const pieces = useMemo(() => piecesOf(props.fen), [props.fen]);
   const capture = Boolean(props.anim && props.anim.hide.includes(props.anim.to));
+  if (!textures) return null;
   return (
     <>
       {pieces.map((piece) => {
@@ -1125,6 +1159,7 @@ function Scene(
     aim: { current: Aim };
     theme: BoardTheme;
     onReady?: () => void;
+    awake?: boolean;
     selectedRef: { current: string | null };
     flippedRef: { current: boolean };
   },
@@ -1162,7 +1197,7 @@ function Scene(
       <PointerFocus aim={props.aim} />
       <Rig
         flipped={props.flipped}
-        autoRotate={props.autoRotate}
+        autoRotate={!!props.autoRotate && props.awake !== false}
         cam={props.cam}
         aim={props.aim}
         selectedRef={props.selectedRef}
@@ -1180,8 +1215,7 @@ function Scene(
         aim={props.aim}
       />
       <Suspense fallback={null}>
-        <Pieces {...props} theme={props.theme} />
-        <BoardReady onReady={props.onReady} />
+        <Pieces {...props} theme={props.theme} onReady={props.onReady} />
       </Suspense>
     </>
   );
@@ -1209,17 +1243,37 @@ export function ChessBoard(props: ChessBoardProps) {
   }, []);
   const theme = applyTint(themeById(themeId), tint);
   const [ready, setReady] = useState(false);
+  const [awake, setAwake] = useState(true);
+  const hostRef = useRef<HTMLDivElement>(null);
+  const markReady = useMemo(() => () => setReady(true), []);
+  useEffect(() => {
+    const el = hostRef.current;
+    if (!el) return;
+    const sync = (visible: boolean) => {
+      setBoardOnScreen(visible);
+      setAwake(visible && !document.hidden);
+    };
+    const io = new IntersectionObserver(([entry]) => sync(entry.isIntersecting), { threshold: 0.08 });
+    io.observe(el);
+    const onHide = () => sync(true);
+    document.addEventListener("visibilitychange", onHide);
+    return () => {
+      io.disconnect();
+      document.removeEventListener("visibilitychange", onHide);
+      setBoardOnScreen(true);
+    };
+  }, []);
   return (
-    <div className="crystal-host" aria-label="Bàn cờ pha lê" aria-busy={!ready}>
+    <div ref={hostRef} className="crystal-host" aria-label="Bàn cờ pha lê" aria-busy={!ready}>
       <div className="absolute inset-0">
         <Canvas
           camera={{ position: [0, 10.2, 9.9], fov: 30, near: 0.08, far: 220 }}
-          dpr={[1, 2]}
+          dpr={[1, 1.5]}
           gl={{ antialias: true, alpha: false, powerPreference: "high-performance", stencil: false }}
           style={{ width: "100%", height: "100%", touchAction: "none" }}
         >
           <Suspense fallback={null}>
-            <Scene {...props} cam={cam} aim={aim} theme={theme} selectedRef={selectedRef} flippedRef={flippedRef} onReady={() => setReady(true)} />
+            <Scene {...props} cam={cam} aim={aim} theme={theme} selectedRef={selectedRef} flippedRef={flippedRef} onReady={markReady} awake={awake} />
           </Suspense>
         </Canvas>
       </div>
@@ -1227,13 +1281,6 @@ export function ChessBoard(props: ChessBoardProps) {
       <CameraPad cam={cam} />
     </div>
   );
-}
-
-function BoardReady({ onReady }: { onReady?: () => void }) {
-  useEffect(() => {
-    onReady?.();
-  }, [onReady]);
-  return null;
 }
 
 function CameraPad({ cam }: { cam: { current: CamApi } }) {

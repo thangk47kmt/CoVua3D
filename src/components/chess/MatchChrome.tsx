@@ -111,6 +111,8 @@ export function MatchChrome({
   onFlip,
   onUndo,
   onResign,
+  onHint,
+  onPlayNow,
   onOfferDraw,
   drawHint,
   onAcceptDraw,
@@ -131,6 +133,8 @@ export function MatchChrome({
   onFlip: () => void;
   onUndo?: () => void;
   onResign?: () => void;
+  onHint?: () => void;
+  onPlayNow?: () => void;
   onOfferDraw?: () => void;
   drawHint?: string | null;
   onAcceptDraw?: () => void;
@@ -154,7 +158,7 @@ export function MatchChrome({
   }, []);
   const label = thinking ? "Tinh tú đang nghĩ…" : status;
   return (
-    <aside className={`panel flex min-h-0 flex-col gap-3 p-3 ${open ? "max-h-[46dvh] overflow-y-auto lg:max-h-none" : ""}`}>
+    <aside className="panel flex min-h-0 max-h-[46dvh] flex-col gap-3 overflow-y-auto p-3 lg:max-h-none">
       <button
         type="button"
         className="btn w-full"
@@ -163,6 +167,38 @@ export function MatchChrome({
       >
         {open ? "Thu thiết lập" : `Thiết lập · ${label}`}
       </button>
+      <div className="max-h-28 min-h-0 overflow-y-auto rounded-lg border border-line">
+        {rows.length === 0 ? (
+          <p className="p-3 text-sm text-muted">Chưa có nước đi.</p>
+        ) : (
+          <ol className="divide-y divide-line">
+            {rows.map((row) => (
+              <li key={row.n} className="grid grid-cols-[2.2rem_1fr_1fr] items-center text-sm tabular-nums">
+                <span className="px-2 text-muted">{row.n}</span>
+                <SanButton san={row.w} ply={row.n * 2 - 1} active={activePly === row.n * 2 - 1} onPick={onPickSan} />
+                <SanButton san={row.b} ply={row.n * 2} active={activePly === row.n * 2} onPick={onPickSan} />
+              </li>
+            ))}
+          </ol>
+        )}
+      </div>
+      <div className={`grid gap-2 ${onPlayNow ? "grid-cols-3" : "grid-cols-2"}`}>
+        {onHint && (
+          <button type="button" className="btn" onClick={onHint} disabled={thinking}>
+            Gợi ý
+          </button>
+        )}
+        {onUndo && (
+          <button type="button" className="btn" onClick={onUndo}>
+            <Undo2 size={16} /> Đi lại
+          </button>
+        )}
+        {onPlayNow && (
+          <button type="button" className={`btn btn-gold ${thinking ? "" : "invisible"}`} disabled={!thinking} onClick={onPlayNow}>
+            Đi ngay
+          </button>
+        )}
+      </div>
       {open && (
         <>
       <div className="flex items-start justify-between gap-3">
@@ -193,31 +229,11 @@ export function MatchChrome({
           )}
         </div>
       )}
-      <div className="min-h-0 flex-1 overflow-y-auto rounded-lg border border-line">
-        {rows.length === 0 ? (
-          <p className="p-3 text-sm text-muted">Chưa có nước đi.</p>
-        ) : (
-          <ol className="divide-y divide-line">
-            {rows.map((row) => (
-              <li key={row.n} className="grid grid-cols-[2.2rem_1fr_1fr] items-center text-sm tabular-nums">
-                <span className="px-2 text-muted">{row.n}</span>
-                <SanButton san={row.w} ply={row.n * 2 - 1} active={activePly === row.n * 2 - 1} onPick={onPickSan} />
-                <SanButton san={row.b} ply={row.n * 2} active={activePly === row.n * 2} onPick={onPickSan} />
-              </li>
-            ))}
-          </ol>
-        )}
-      </div>
       {children}
       <div className="grid grid-cols-2 gap-2">
         <button type="button" className="btn" onClick={onFlip}>
           <RotateCw size={16} /> Xoay bàn
         </button>
-        {onUndo && (
-          <button type="button" className="btn" onClick={onUndo}>
-            <Undo2 size={16} /> Đi lại
-          </button>
-        )}
         {onOfferDraw && (
           <button type="button" className="btn" onClick={onOfferDraw}>
             <Handshake size={16} /> Xin hòa

@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { Chess } from "chess.js";
 import { ClientBoard } from "@/components/chess/ClientBoard";
@@ -32,6 +32,20 @@ export function PracticeDesk() {
   const [promo, setPromo] = useState<Promo | null>(null);
   const [stamp, setStamp] = useState(0);
 
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem("celestial-lesson");
+      if (!raw) return;
+      const data = JSON.parse(raw) as { index?: number; free?: boolean };
+      if (data.free) openFree();
+      else if (typeof data.index === "number" && data.index > 0 && data.index < LESSONS.length) openLesson(data.index);
+    } catch {
+      /* ignore */
+    }
+    // Restore once. openLesson is stable enough for the saved index.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   function load(nextFen: string) {
     chessRef.current = new Chess(nextFen);
     setFen(nextFen);
@@ -49,6 +63,11 @@ export function PracticeDesk() {
     setFree(false);
     setIndex(next);
     load(item.fen);
+    try {
+      localStorage.setItem("celestial-lesson", JSON.stringify({ index: next, free: false }));
+    } catch {
+      /* private mode */
+    }
   }
 
   function openFree() {
@@ -56,6 +75,11 @@ export function PracticeDesk() {
     setDone(false);
     setNote("Đi cả hai bên. Bàn không có đối thủ — dùng để thử ý và quay lại nước vừa đi.");
     load(START);
+    try {
+      localStorage.setItem("celestial-lesson", JSON.stringify({ index, free: true }));
+    } catch {
+      /* private mode */
+    }
   }
 
   function play(from: string, to: string, promotion?: "q" | "r" | "b" | "n") {
