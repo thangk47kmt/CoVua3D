@@ -365,8 +365,60 @@
   .crystal-sheen,
   .sq-check::after,
   body::after,
-  .crystal-host::before {
+  .crystal-host::before,
+  .board-splash-bar::after {
     transition: none;
     animation: none;
   }
+}
+
+.board-splash {
+  position: absolute;
+  inset: 0;
+  z-index: 8;
+  display: grid;
+  place-items: center;
+  background:
+    radial-gradient(ellipse 70% 55% at 50% 42%, rgba(88, 110, 210, 0.28), transparent 68%),
+    #07060e;
+}
+.board-splash-card {
+  display: grid;
+  justify-items: center;
+  gap: 0.45rem;
+  padding: 1.4rem 1.8rem;
+  border: 1px solid color-mix(in srgb, var(--color-gold) 45%, transparent);
+  border-radius: 1rem;
+  background: color-mix(in srgb, #0c1020 82%, transparent);
+}
+.board-splash-kicker {
+  font-size: 0.72rem;
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+  color: var(--color-gold);
+}
+.board-splash-title {
+  font-size: 1.35rem;
+  color: var(--color-fg);
+}
+.board-splash-bar {
+  margin-top: 0.35rem;
+  width: 8.5rem;
+  height: 0.18rem;
+  overflow: hidden;
+  border-radius: 999px;
+  background: color-mix(in srgb, white 16%, transparent);
+}
+.board-splash-bar::after {
+  content: "";
+  display: block;
+  width: 40%;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--color-gold);
+  animation: splash-slide 1.1s ease-in-out infinite;
+}
+@keyframes splash-slide {
+  0% { transform: translateX(-120%); }
+  100% { transform: translateX(280%); }
 }

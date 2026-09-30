@@ -3,6 +3,7 @@ import { useFrame } from "@react-three/fiber";
 import { Billboard } from "@react-three/drei";
 import {
   AdditiveBlending,
+  BackSide,
   BufferAttribute,
   BufferGeometry,
   CanvasTexture,
@@ -16,24 +17,6 @@ import {
   type Points,
 } from "three";
 import type { BoardTheme } from "./themes";
-
-function stage(inner: string, mid: string, outer: string): CanvasTexture {
-  const canvas = document.createElement("canvas");
-  canvas.width = 512;
-  canvas.height = 512;
-  const ctx = canvas.getContext("2d");
-  if (ctx) {
-    const g = ctx.createRadialGradient(256, 256, 24, 256, 256, 256);
-    g.addColorStop(0, inner);
-    g.addColorStop(0.42, mid);
-    g.addColorStop(1, outer);
-    ctx.fillStyle = g;
-    ctx.fillRect(0, 0, 512, 512);
-  }
-  const tex = new CanvasTexture(canvas);
-  tex.colorSpace = SRGBColorSpace;
-  return tex;
-}
 
 function bands(colors: string[]): CanvasTexture {
   const canvas = document.createElement("canvas");
@@ -66,6 +49,231 @@ function puff(): CanvasTexture {
   const tex = new CanvasTexture(canvas);
   tex.colorSpace = SRGBColorSpace;
   return tex;
+}
+
+function nebulaSky(): CanvasTexture {
+  const canvas = document.createElement("canvas");
+  canvas.width = 2048;
+  canvas.height = 1024;
+  const ctx = canvas.getContext("2d");
+  if (ctx) {
+    const sky = ctx.createLinearGradient(0, 0, 0, 1024);
+    sky.addColorStop(0, "#050714");
+    sky.addColorStop(0.42, "#120c2e");
+    sky.addColorStop(0.55, "#1a1240");
+    sky.addColorStop(1, "#070914");
+    ctx.fillStyle = sky;
+    ctx.fillRect(0, 0, 2048, 1024);
+    const washes: [number, number, number, number, string][] = [
+      [1040, 470, 780, 220, "rgba(92, 48, 180, 0.28)"],
+      [620, 520, 640, 180, "rgba(36, 78, 190, 0.22)"],
+      [1500, 500, 560, 160, "rgba(210, 150, 70, 0.16)"],
+      [980, 430, 420, 90, "rgba(230, 210, 255, 0.12)"],
+    ];
+    for (const [x, y, rx, ry, color] of washes) {
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.scale(rx / ry, 1);
+      const g = ctx.createRadialGradient(0, 0, ry * 0.15, 0, 0, ry);
+      g.addColorStop(0, color);
+      g.addColorStop(1, "rgba(0,0,0,0)");
+      ctx.fillStyle = g;
+      ctx.fillRect(-rx, -ry, rx * 2, ry * 2);
+      ctx.restore();
+    }
+    ctx.globalAlpha = 0.55;
+    const band = ctx.createLinearGradient(0, 430, 0, 620);
+    band.addColorStop(0, "rgba(0,0,0,0)");
+    band.addColorStop(0.45, "rgba(210, 180, 255, 0.16)");
+    band.addColorStop(0.5, "rgba(255, 236, 200, 0.22)");
+    band.addColorStop(0.55, "rgba(120, 160, 255, 0.14)");
+    band.addColorStop(1, "rgba(0,0,0,0)");
+    ctx.fillStyle = band;
+    ctx.fillRect(0, 400, 2048, 250);
+    ctx.globalAlpha = 1;
+    for (let i = 0; i < 1600; i += 1) {
+      const gold = i % 11 === 0;
+      ctx.fillStyle = gold ? "#ffe7b8" : "#f4f7ff";
+      ctx.globalAlpha = gold ? 0.55 + Math.random() * 0.45 : 0.2 + Math.random() * 0.75;
+      const s = i % 23 === 0 ? 2.2 : i % 7 === 0 ? 1.4 : 0.8;
+      ctx.beginPath();
+      ctx.arc(Math.random() * 2048, Math.random() * 1024, s, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+  }
+  const tex = new CanvasTexture(canvas);
+  tex.colorSpace = SRGBColorSpace;
+  return tex;
+}
+
+function battleSky(top: string, glow: string): CanvasTexture {
+  const canvas = document.createElement("canvas");
+  canvas.width = 16;
+  canvas.height = 256;
+  const ctx = canvas.getContext("2d");
+  if (ctx) {
+    const g = ctx.createLinearGradient(0, 0, 0, 256);
+    g.addColorStop(0, top);
+    g.addColorStop(0.72, top);
+    g.addColorStop(1, glow);
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, 16, 256);
+  }
+  const tex = new CanvasTexture(canvas);
+  tex.colorSpace = SRGBColorSpace;
+  return tex;
+}
+
+function battleGround(earth: string, scorch: string, fire: string): CanvasTexture {
+  const canvas = document.createElement("canvas");
+  canvas.width = 512;
+  canvas.height = 512;
+  const ctx = canvas.getContext("2d");
+  if (ctx) {
+    ctx.fillStyle = earth;
+    ctx.fillRect(0, 0, 512, 512);
+    for (let i = 0; i < 28; i += 1) {
+      ctx.fillStyle = i % 2 === 0 ? scorch : "rgba(0,0,0,0.35)";
+      ctx.globalAlpha = 0.45;
+      ctx.beginPath();
+      ctx.ellipse(40 + Math.random() * 430, 40 + Math.random() * 430, 10 + Math.random() * 36, 6 + Math.random() * 16, Math.random() * 3, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+    for (let i = 0; i < 10; i += 1) {
+      const a = (i / 10) * Math.PI * 2 + 0.3;
+      const pr = 108 + (i % 3) * 36;
+      const x = 256 + Math.cos(a) * pr;
+      const y = 256 + Math.sin(a) * pr;
+      const g = ctx.createRadialGradient(x, y, 0, x, y, 46);
+      g.addColorStop(0, "#fff4c8");
+      g.addColorStop(0.22, fire);
+      g.addColorStop(0.55, "rgba(120,28,8,0.85)");
+      g.addColorStop(1, "rgba(0,0,0,0)");
+      ctx.fillStyle = g;
+      ctx.fillRect(x - 52, y - 52, 104, 104);
+    }
+  }
+  const tex = new CanvasTexture(canvas);
+  tex.colorSpace = SRGBColorSpace;
+  return tex;
+}
+
+function RisingSmoke({
+  color,
+  map,
+  seeds,
+}: {
+  color: string;
+  map: CanvasTexture;
+  seeds: { x: number; z: number; s: number; p: number; speed: number }[];
+}) {
+  const groups = useRef<(Group | null)[]>([]);
+  useFrame(() => {
+    const t = performance.now() / 1000;
+    seeds.forEach((seed, i) => {
+      const node = groups.current[i];
+      if (!node) return;
+      const u = (seed.p + t * seed.speed) % 1;
+      node.position.set(seed.x + Math.sin(t * 0.15 + i) * 0.25, -2.7 + u * 3.4, seed.z);
+      node.scale.setScalar(0.75 + u * 0.7);
+      const cloud = node.children[0]?.children[0] as Mesh | undefined;
+      const material = cloud?.material as { opacity: number } | undefined;
+      if (material) material.opacity = Math.sin(u * Math.PI) * 0.42;
+    });
+  });
+  return (
+    <group>
+      {seeds.map((seed, i) => (
+        <group key={`${seed.x}-${seed.z}`} ref={(node) => { groups.current[i] = node; }}>
+          <Billboard>
+            <mesh raycast={() => null}>
+              <planeGeometry args={[seed.s * 1.8, seed.s * 2.4]} />
+              <meshBasicMaterial map={map} color={color} transparent opacity={0.35} depthWrite={false} />
+            </mesh>
+          </Billboard>
+        </group>
+      ))}
+    </group>
+  );
+}
+
+function WarBelow({
+  earth,
+  scorch,
+  fire,
+  smoke,
+  skyTop,
+  skyGlow,
+}: {
+  earth: string;
+  scorch: string;
+  fire: string;
+  smoke: string;
+  skyTop: string;
+  skyGlow: string;
+}) {
+  const ground = useMemo(() => battleGround(earth, scorch, fire), [earth, scorch, fire]);
+  const sky = useMemo(() => battleSky(skyTop, skyGlow), [skyTop, skyGlow]);
+  const smokeMap = useMemo(() => puff(), []);
+  const seeds = useMemo(
+    () =>
+      Array.from({ length: 10 }, (_, i) => {
+        const a = (i / 10) * Math.PI * 2 + 0.3;
+        const r = 11 + (i % 3) * 3.2;
+        return { x: Math.cos(a) * r, z: Math.sin(a) * r, s: 1.5 + (i % 3) * 0.35, p: (i * 0.17) % 1, speed: 0.045 + (i % 3) * 0.01 };
+      }),
+    [],
+  );
+  const embers = useMemo(() => {
+    const count = 70;
+    const array = new Float32Array(count * 3);
+    for (let i = 0; i < count; i += 1) {
+      const a = Math.random() * Math.PI * 2;
+      const r = 10 + Math.random() * 16;
+      array[i * 3] = Math.cos(a) * r;
+      array[i * 3 + 1] = -2.5 + Math.random() * 1.2;
+      array[i * 3 + 2] = Math.sin(a) * r;
+    }
+    const geometry = new BufferGeometry();
+    geometry.setAttribute("position", new BufferAttribute(array, 3));
+    return geometry;
+  }, []);
+  const flicker = useRef<Points>(null);
+  useFrame(() => {
+    const mat = flicker.current?.material as { size?: number; opacity?: number } | undefined;
+    if (!mat) return;
+    const t = performance.now() / 1000;
+    mat.size = 0.16 + Math.sin(t * 8) * 0.03;
+    mat.opacity = 0.65 + Math.sin(t * 5) * 0.2;
+  });
+  return (
+    <group>
+      <mesh raycast={() => null}>
+        <sphereGeometry args={[78, 28, 18]} />
+        <meshBasicMaterial map={sky} side={BackSide} />
+      </mesh>
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -3.15, 0]} raycast={() => null}>
+        <circleGeometry args={[40, 48]} />
+        <meshBasicMaterial map={ground} />
+      </mesh>
+      {seeds
+        .filter((_, i) => i % 2 === 0)
+        .map((seed) => (
+          <Billboard key={`flame-${seed.x}`} position={[seed.x, -2.35, seed.z]}>
+            <mesh raycast={() => null}>
+              <planeGeometry args={[2.4, 2.4]} />
+              <meshBasicMaterial map={smokeMap} color={fire} transparent opacity={0.95} blending={AdditiveBlending} depthWrite={false} />
+            </mesh>
+          </Billboard>
+        ))}
+      <points ref={flicker} geometry={embers} raycast={() => null}>
+        <pointsMaterial color={fire} size={0.16} transparent opacity={0.85} sizeAttenuation blending={AdditiveBlending} depthWrite={false} />
+      </points>
+      <RisingSmoke color={smoke} map={smokeMap} seeds={seeds} />
+    </group>
+  );
 }
 
 function Stars({ count, color, radius }: { count: number; color: string; radius: number }) {
@@ -109,16 +317,17 @@ function GalaxyWorld({ theme }: { theme: BoardTheme }) {
   const planetPos = useMemo(
     () =>
       [
-        [-16, 4.4, -14, 1.55],
-        [16, 4.4, -14, 1.55],
-        [0, 7.2, -22, 2.05],
-        [-9, 2.2, -20, 0.72],
-        [9, 2.2, -20, 0.72],
+        [-22, 10, -30, 1.7],
+        [24, 8, -28, 1.45],
+        [2, 16, -36, 2.2],
+        [-14, 7, -32, 0.85],
+        [15, 6, -31, 0.8],
       ] as const,
     [],
   );
   const hit = useRef({ until: 0, next: 5, x: 0, y: 2, z: -14 });
-  const sky = useMemo(() => stage("#050814", "#16306e", "#070b18"), []);
+  const sky = useMemo(() => nebulaSky(), []);
+  const glow = useMemo(() => puff(), []);
   const skins = useMemo(
     () => [
       bands(["#6a4a28", "#c4a06a", "#8a6234", "#e6d2a4", "#6a4a28"]),
@@ -188,22 +397,37 @@ function GalaxyWorld({ theme }: { theme: BoardTheme }) {
 
   return (
     <group>
-      <Stars count={160} color="#d5e4ff" radius={34} />
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.7, 0]} raycast={() => null}>
-        <circleGeometry args={[30, 40]} />
-        <meshBasicMaterial map={sky} />
+      <Stars count={460} color="#e7f1ff" radius={58} />
+      <Stars count={70} color="#ffe3a4" radius={46} />
+      <mesh raycast={() => null}>
+        <sphereGeometry args={[90, 48, 32]} />
+        <meshBasicMaterial map={sky} side={BackSide} />
       </mesh>
       <group ref={planets}>
         {planetPos.map((p, i) => (
-          <mesh key={i} position={[p[0], p[1], p[2]]} raycast={() => null}>
-            <sphereGeometry args={[p[3], 12, 10]} />
-            <meshStandardMaterial map={skins[i]} roughness={0.72} metalness={0.08} emissive={theme.lightB} emissiveIntensity={0.08} />
-          </mesh>
+          <group key={i} position={[p[0], p[1], p[2]]}>
+            <mesh raycast={() => null}>
+              <sphereGeometry args={[p[3], 24, 18]} />
+              <meshStandardMaterial map={skins[i]} roughness={0.55} metalness={0.12} emissive={i === 2 ? "#e4c27a" : "#6a88c8"} emissiveIntensity={0.12} />
+            </mesh>
+            <Billboard>
+              <mesh raycast={() => null}>
+                <planeGeometry args={[p[3] * 3.1, p[3] * 3.1]} />
+                <meshBasicMaterial map={glow} transparent opacity={0.28} depthWrite={false} blending={AdditiveBlending} toneMapped={false} />
+              </mesh>
+            </Billboard>
+            {i === 2 && (
+              <mesh rotation={[1.15, 0.2, 0.4]} raycast={() => null}>
+                <torusGeometry args={[p[3] * 1.85, 0.08, 8, 48]} />
+                <meshStandardMaterial color="#e7d2a4" emissive="#c4a06a" emissiveIntensity={0.35} metalness={0.6} roughness={0.35} />
+              </mesh>
+            )}
+          </group>
         ))}
       </group>
       <instancedMesh ref={rocks} args={[undefined, undefined, belt.length]} raycast={() => null} frustumCulled={false}>
         <dodecahedronGeometry args={[1, 0]} />
-        <meshStandardMaterial color="#9a8b74" roughness={0.86} metalness={0.12} />
+        <meshStandardMaterial color="#d7e4ff" roughness={0.35} metalness={0.2} emissive="#7c40d2" emissiveIntensity={0.35} />
       </instancedMesh>
       <mesh ref={boom} visible={false} raycast={() => null}>
         <sphereGeometry args={[0.55, 12, 12]} />
@@ -245,20 +469,16 @@ function Arena() {
 }
 
 function RomeWorld() {
-  const ground = useMemo(() => stage("#3a2a1c", "#8a6844", "#2a1c12"), []);
   return (
     <group>
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.72, 0]} raycast={() => null}>
-        <circleGeometry args={[34, 64]} />
-        <meshStandardMaterial map={ground} roughness={0.95} />
-      </mesh>
+      <WarBelow earth="#3a2c22" scorch="#6a4a34" fire="#ff7a32" smoke="#f4ece2" skyTop="#16100c" skyGlow="#3a2818" />
       <Arena />
       <mesh rotation={[Math.PI / 2, 0, 0]} position={[0, 1.28, 0]} raycast={() => null}>
         <torusGeometry args={[6.5, 0.11, 8, 56]} />
         <meshStandardMaterial color="#f6efe2" metalness={0.15} roughness={0.55} />
       </mesh>
       {[-1, 1].map((side) => (
-        <mesh key={side} position={[side * 14, -0.15, -11]} rotation={[0, side * 0.4, 0]} raycast={() => null}>
+        <mesh key={side} position={[side * 16, -3.15, -18]} rotation={[0, side * 0.4, 0]} raycast={() => null}>
           <sphereGeometry args={[3.2, 18, 12, 0, Math.PI * 2, 0, Math.PI / 2]} />
           <meshStandardMaterial color="#6a5438" roughness={1} />
         </mesh>
@@ -268,47 +488,6 @@ function RomeWorld() {
 }
 
 function SanguoWorld({ theme }: { theme: BoardTheme }) {
-  const ground = useMemo(() => stage("#1a140e", "#4a3020", "#120c0a"), []);
-  const smoke = useMemo(() => puff(), []);
-  const fires = useRef<Points>(null);
-  const clouds = useRef<Group>(null);
-  const seeds = useMemo(
-    () =>
-      Array.from({ length: 6 }, (_, i) => {
-        const a = (i / 6) * Math.PI * 2;
-        const r = 8 + (i % 4) * 3.2;
-        return { x: Math.cos(a) * r, z: Math.sin(a) * r, s: 1.6 + (i % 3) * 0.7, p: i / 12 };
-      }),
-    [],
-  );
-  const fireGeom = useMemo(() => {
-    const count = 16;
-    const array = new Float32Array(count * 3);
-    for (let i = 0; i < count; i += 1) {
-      const a = Math.random() * Math.PI * 2;
-      const r = 7.2 + Math.random() * 16;
-      array[i * 3] = Math.cos(a) * r;
-      array[i * 3 + 1] = 0.25 + Math.random() * 0.8;
-      array[i * 3 + 2] = Math.sin(a) * r;
-    }
-    const geometry = new BufferGeometry();
-    geometry.setAttribute("position", new BufferAttribute(array, 3));
-    return geometry;
-  }, []);
-  useFrame(() => {
-    const t = performance.now() / 1000;
-    const mat = fires.current?.material as { size?: number } | undefined;
-    if (mat) mat.size = 0.22 + Math.sin(t * 7) * 0.06;
-    clouds.current?.children.forEach((child, i) => {
-      const seed = seeds[i];
-      if (!seed) return;
-      const u = (seed.p + t * 0.035) % 1;
-      child.position.set(seed.x + Math.sin(t * 0.2 + i) * 0.3, 0.6 + u * 4.2, seed.z);
-      const cloud = child.children[0] as Mesh | undefined;
-      const material = cloud?.material as { opacity: number } | undefined;
-      if (material) material.opacity = Math.sin(u * Math.PI) * 0.42;
-    });
-  });
   const flags = [
     [6.3, 0, "#1d6b3a"],
     [-6.3, 0, "#1a1a1a"],
@@ -317,25 +496,9 @@ function SanguoWorld({ theme }: { theme: BoardTheme }) {
   ] as const;
   return (
     <group>
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.72, 0]} raycast={() => null}>
-        <circleGeometry args={[34, 40]} />
-        <meshStandardMaterial map={ground} roughness={1} />
-      </mesh>
-      <points ref={fires} geometry={fireGeom} raycast={() => null}>
-        <pointsMaterial color={theme.lightA} size={0.24} transparent opacity={0.9} sizeAttenuation blending={AdditiveBlending} depthWrite={false} />
-      </points>
-      <group ref={clouds}>
-        {seeds.map((seed) => (
-          <Billboard key={`${seed.x}${seed.z}`} position={[seed.x, 1, seed.z]}>
-            <mesh raycast={() => null}>
-              <planeGeometry args={[seed.s * 2.4, seed.s * 1.5]} />
-              <meshBasicMaterial map={smoke} color="#2a2420" transparent opacity={0.25} depthWrite={false} />
-            </mesh>
-          </Billboard>
-        ))}
-      </group>
+      <WarBelow earth="#2c1814" scorch="#5a3024" fire={theme.lightA} smoke="#f4ece2" skyTop="#120a08" skyGlow="#5a2818" />
       {flags.map(([x, z, color]) => (
-        <group key={color} position={[x, 0, z]}>
+        <group key={color} position={[x, -0.2, z]}>
           <mesh position={[0, 1.15, 0]} raycast={() => null}>
             <cylinderGeometry args={[0.035, 0.045, 2.3, 6]} />
             <meshStandardMaterial color="#3a2a18" />
@@ -351,28 +514,37 @@ function SanguoWorld({ theme }: { theme: BoardTheme }) {
 }
 
 function SimpleWorld({ theme }: { theme: BoardTheme }) {
-  const ground = useMemo(() => {
-    if (theme.world === "volcano") return stage("#1a0c0a", "#6a2414", "#100806");
-    if (theme.world === "sea") return stage("#063040", "#0e6e86", "#042028");
-    if (theme.world === "shrine") return stage("#101820", "#243044", "#0c1016");
-    return stage(theme.sky, theme.fog, "#07060c");
-  }, [theme]);
+  const palette =
+    theme.world === "volcano"
+      ? { earth: "#1a0c0a", scorch: "#4a1810", fire: "#ff5a24", smoke: "#c8a090", skyTop: "#1a0a08", skyGlow: "#a84820" }
+      : theme.world === "sea"
+        ? { earth: "#062028", scorch: "#0c3040", fire: "#e07030", smoke: "#b7e4e0", skyTop: "#042028", skyGlow: "#1a6878" }
+        : theme.world === "shrine"
+          ? { earth: "#12141c", scorch: "#2a2030", fire: "#e06040", smoke: "#d0c8e0", skyTop: "#10131c", skyGlow: "#6a5088" }
+          : theme.world === "nile"
+            ? { earth: "#3a2a16", scorch: "#6a4a28", fire: "#e07830", smoke: "#f3e6d0", skyTop: "#1a120c", skyGlow: "#6a4820" }
+            : theme.world === "frost"
+              ? { earth: "#1a2834", scorch: "#2c4054", fire: "#e07040", smoke: "#e7f3ff", skyTop: "#101820", skyGlow: "#3a5870" }
+              : theme.world === "neon"
+                ? { earth: "#140818", scorch: "#301028", fire: "#ff40a0", smoke: "#d8f4ff", skyTop: "#0a0612", skyGlow: "#401850" }
+                : theme.world === "viet"
+                  ? { earth: "#3a2214", scorch: "#6a3818", fire: "#e07030", smoke: "#f3e6d0", skyTop: "#1a100c", skyGlow: "#6a3818" }
+                  : theme.world === "sengoku"
+                    ? { earth: "#2a1814", scorch: "#4a2820", fire: "#d06030", smoke: "#f0e4d8", skyTop: "#140e0c", skyGlow: "#5a3020" }
+                    : { earth: "#101428", scorch: "#243044", fire: "#e07040", smoke: "#c8ffe0", skyTop: "#100c20", skyGlow: "#3a6878" };
   return (
     <group>
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.72, 0]} raycast={() => null}>
-        <circleGeometry args={[30, 36]} />
-        <meshBasicMaterial map={ground} />
-      </mesh>
+      <WarBelow {...palette} />
       {theme.world === "volcano" && (
-        <mesh position={[0, 1.2, -16]} raycast={() => null}>
-          <coneGeometry args={[4.2, 6, 8]} />
-          <meshStandardMaterial color="#3a1812" emissive="#ff5a20" emissiveIntensity={0.15} />
+        <mesh position={[0, -1.1, -18]} raycast={() => null}>
+          <coneGeometry args={[5.2, 7.5, 8]} />
+          <meshStandardMaterial color="#3a1812" emissive="#ff5a20" emissiveIntensity={0.35} />
         </mesh>
       )}
       {theme.world === "sea" && (
-        <mesh position={[0, 5.5, -16]} raycast={() => null}>
-          <sphereGeometry args={[1.1, 16, 16]} />
-          <meshStandardMaterial color="#f4f0e4" emissive="#fff6dc" emissiveIntensity={0.4} />
+        <mesh position={[0, 8, -20]} raycast={() => null}>
+          <sphereGeometry args={[1.4, 16, 16]} />
+          <meshStandardMaterial color="#f4f0e4" emissive="#fff6dc" emissiveIntensity={0.55} />
         </mesh>
       )}
       {theme.world === "shrine" && (
@@ -391,7 +563,24 @@ function SimpleWorld({ theme }: { theme: BoardTheme }) {
           </mesh>
         </group>
       )}
-      {(theme.world === "aurora" || theme.world === "shrine") && <Stars count={80} color="#e7f0ff" radius={28} />}
+      {(theme.world === "aurora" || theme.world === "shrine" || theme.world === "neon" || theme.world === "frost") && (
+        <Stars count={90} color={theme.world === "neon" ? "#b8fff6" : "#e7f0ff"} radius={40} />
+      )}
+    </group>
+  );
+}
+
+function ClassicWorld() {
+  return (
+    <group>
+      <mesh position={[0, -1.15, 0]} rotation={[-Math.PI / 2, 0, 0]} raycast={() => null}>
+        <circleGeometry args={[22, 48]} />
+        <meshStandardMaterial color="#3a2c20" roughness={0.92} metalness={0.02} />
+      </mesh>
+      <mesh raycast={() => null}>
+        <sphereGeometry args={[64, 24, 16]} />
+        <meshBasicMaterial color="#12100e" side={BackSide} />
+      </mesh>
     </group>
   );
 }
@@ -400,5 +589,6 @@ export function World({ theme }: { theme: BoardTheme }) {
   if (theme.world === "galaxy") return <GalaxyWorld theme={theme} />;
   if (theme.world === "rome") return <RomeWorld />;
   if (theme.world === "sanguo") return <SanguoWorld theme={theme} />;
+  if (theme.world === "classic") return <ClassicWorld />;
   return <SimpleWorld theme={theme} />;
 }

@@ -90,25 +90,48 @@ function evaluate(chess: Chess): number {
   return chess.turn() === "w" ? raw : -raw;
 }
 
-function moveScore(move: Move): number {
-  let score = 0;
-  if (move.isPromotion()) score += 900;
-  if (move.isCapture()) score += 1200 + VAL[move.captured ?? "p"] * 8 - VAL[move.piece];
-  if (move.san.endsWith("#")) score += 4000;
-  else if (move.san.endsWith("+")) score += 40;
-  return score;
+function moveKey(move: Move): string {
+  return `${move.from}${move.to}${move.promotion ?? ""}`;
 }
 
-function order(moves: Move[], first?: Move | null): Move[] {
-  const sorted = moves.slice().sort((a, b) => moveScore(b) - moveScore(a));
-  if (!first) return sorted;
-  const key = `${first.from}${first.to}${first.promotion ?? ""}`;
-  const index = sorted.findIndex((move) => `${move.from}${move.to}${move.promotion ?? ""}` === key);
-  if (index > 0) {
-    const [pick] = sorted.splice(index, 1);
-    sorted.unshift(pick);
-  }
-  return sorted;
+function sqIndex(square: string): number {
+  return square.charCodeAt(0) - 97 + (square.charCodeAt(1) - 49) * 8;
+}
+
+function orderMoves(
+  moves: Move[],
+  ply: number,
+  first?: string | null,
+  killers?: string[],
+  history?: Int32Array,
+): Move[] {
+  const scored = moves.map((move) => {
+    const key = moveKey(move);
+    let score = 0;
+    if (first && key === first) score += 40_000;
+    if (move.isPromotion()) score += 9_000;
+    if (move.isCapture()) score += 12_000 + VAL[move.captured ?? "p"] * 8 - VAL[move.piece];
+    else if (killers) {
+      if (key === killers[ply * 2]) score += 6_000;
+      else if (key === killers[ply * 2 + 1]) score += 5_000;
+      if (history) {
+        const color = move.color === "w" ? 0 : 1;
+        score += history[color * 4096 + sqIndex(move.from) * 64 + sqIndex(move.to)] ?? 0;
+      }
+    }
+    if (move.san.endsWith("#")) score += 20_000;
+    else if (move.san.endsWith("+")) score += 80;
+    return { move, score };
+  });
+  scored.sort((a, b) => b.score - a.score);
+  return scored.map((item) => item.move);
+}
+
+function rememberKiller(killers: string[], ply: number, key: string) {
+  const slot = ply * 2;
+  if (killers[slot] === key) return;
+  killers[slot + 1] = killers[slot] ?? "";
+  killers[slot] = key;
 }
 
 function toEngine(move: Move): EngineMove {
@@ -124,78 +147,65 @@ export function search(fen: string, movetimeMs: number, noise: number, depthCap:
   const chess = new Chess(fen);
   const rootMoves = chess.moves({ verbose: true });
   if (rootMoves.length === 0) return null;
+  if (rootMoves.length === 1) return toEngine(rootMoves[0]);
 
-  if (noise > 0.5 && Math.random() < noise * 0.55) {
-    const pick = rootMoves[Math.floor(Math.random() * rootMoves.length)];
-    return toEngine(pick);
-  }
-
+  const cap = Math.max(1, Math.min(5, depthCap));
   const deadline = nowMs() + Math.max(40, movetimeMs);
+  const killers = new Array<string>(128).fill("");
+  const history = new Int32Array(8192);
   let aborted = false;
-  let nodes = 0;
-  const nodeCap = 180_000;
-  let pv: Move | null = null;
+  let pvKey = "";
+  let finished: { move: Move; score: number }[] = [];
 
-  const quiesce = (alphaIn: number, beta: number, left: number): number => {
-    nodes += 1;
-    if (nodes > nodeCap || nowMs() > deadline) {
-      aborted = true;
-      return evaluate(chess);
-    }
-    const inCheck = chess.inCheck();
-    let alpha = alphaIn;
-    if (!inCheck) {
-      const stand = evaluate(chess);
-      if (stand >= beta) return beta;
-      if (stand > alpha) alpha = stand;
-      if (left <= 0) return stand;
-    } else if (left <= 0) {
-      return evaluate(chess);
-    }
-    let moves = chess.moves({ verbose: true });
-    if (moves.length === 0) return inCheck ? -MATE + 8 : 0;
-    if (!inCheck) moves = moves.filter((move) => move.isCapture() || move.isPromotion());
-    if (moves.length === 0) return alpha;
-    for (const move of order(moves)) {
-      chess.move(move);
-      const score = -quiesce(-beta, -alpha, left - 1);
-      chess.undo();
-      if (aborted) return 0;
-      if (score >= beta) return beta;
-      if (score > alpha) alpha = score;
-    }
-    return alpha;
-  };
+  const mateScore = (ply: number) => -MATE + ply;
 
   const negamax = (depth: number, ply: number, alphaIn: number, beta: number): number => {
-    nodes += 1;
-    if (nodes > nodeCap || (depth > 0 && nowMs() > deadline)) {
+    if (depth > 0 && nowMs() > deadline) {
       aborted = true;
       return evaluate(chess);
     }
-    if (depth === 0) return depthCap >= 3 ? quiesce(alphaIn, beta, 2) : evaluate(chess);
-    const moves = order(chess.moves({ verbose: true }));
-    if (moves.length === 0) return chess.inCheck() ? -MATE + ply : 0;
+    if (depth === 0) {
+      if (chess.inCheck() && chess.moves().length === 0) return mateScore(ply);
+      return evaluate(chess);
+    }
+
+    const checking = chess.inCheck();
+    const moves = orderMoves(chess.moves({ verbose: true }), ply, null, killers, history);
+    if (moves.length === 0) return checking ? mateScore(ply) : 0;
+
     let alpha = alphaIn;
     let best = -MATE;
-    for (const move of moves) {
+    for (let index = 0; index < moves.length; index += 1) {
+      const move = moves[index];
+      const quiet = !move.isCapture() && !move.isPromotion() && !checking;
       chess.move(move);
       const score = -negamax(depth - 1, ply + 1, -beta, -alpha);
       chess.undo();
       if (aborted) return best;
       if (score > best) best = score;
-      if (score > alpha) alpha = score;
-      if (alpha >= beta) break;
+      if (score > alpha) {
+        alpha = score;
+        if (alpha >= beta) {
+          if (quiet) {
+            rememberKiller(killers, ply, moveKey(move));
+            const color = move.color === "w" ? 0 : 1;
+            history[color * 4096 + sqIndex(move.from) * 64 + sqIndex(move.to)] += depth * depth;
+          }
+          break;
+        }
+      }
     }
     return best;
   };
 
-  const cap = Math.max(1, Math.min(5, depthCap));
-  for (let depth = 1; depth <= cap; depth += 1) {
+  const wideCap = Math.min(cap, 2);
+  for (let depth = 1; depth <= wideCap; depth += 1) {
     aborted = false;
+    const iter: { move: Move; score: number }[] = [];
     let localBest = rootMoves[0];
     let localScore = -Infinity;
-    for (const move of order(rootMoves, pv)) {
+    const ordered = orderMoves(rootMoves, 0, pvKey || null, killers, history);
+    for (const move of ordered) {
       if (depth > 1 && nowMs() > deadline) {
         aborted = true;
         break;
@@ -204,29 +214,66 @@ export function search(fen: string, movetimeMs: number, noise: number, depthCap:
       const score = -negamax(depth - 1, 1, -MATE, MATE);
       chess.undo();
       if (aborted) break;
+      iter.push({ move, score });
       if (score > localScore) {
         localScore = score;
         localBest = move;
       }
     }
-    if (aborted && depth > 1) break;
-    pv = localBest;
-    if (localScore > MATE - 50) break;
+    if ((aborted && depth > 1) || iter.length === 0) break;
+    finished = iter;
+    pvKey = moveKey(localBest);
+    if (localScore > MATE - 80) break;
   }
 
-  let chosen = pv ?? rootMoves[0];
-  if (noise > 0 && Math.random() < noise) {
-    const scored = rootMoves.map((move) => {
-      chess.move(move);
-      const moverWasWhite = chess.turn() === "b";
-      const score = moverWasWhite ? evalWhite(chess) : -evalWhite(chess);
+  if (finished.length === 0) return toEngine(rootMoves[0]);
+  finished.sort((a, b) => b.score - a.score);
+
+  if (cap >= 3 && finished[0].score < MATE - 80) {
+    const width = cap >= 4 ? 5 : 3;
+    const confirmed: { move: Move; score: number }[] = [];
+    for (const item of finished.slice(0, width)) {
+      if (nowMs() + 40 > deadline) break;
+      aborted = false;
+      chess.move(item.move);
+      const score = -negamax(2, 1, -MATE, MATE);
       chess.undo();
-      return { move, score };
-    });
-    scored.sort((a, b) => b.score - a.score);
-    const band = Math.max(80, 220 * noise);
-    const pool = scored.filter((item) => item.score >= scored[0].score - band).slice(0, noise > 0.5 ? 6 : 3);
-    chosen = pool[Math.floor(Math.random() * pool.length)]?.move ?? chosen;
+      if (aborted) break;
+      confirmed.push({ move: item.move, score });
+    }
+    let picked = confirmed;
+    if (cap >= 4 && confirmed.length >= 2) {
+      confirmed.sort((a, b) => b.score - a.score);
+      const deeper: { move: Move; score: number }[] = [];
+      const probe = confirmed.slice();
+      for (const item of probe) {
+        if (nowMs() + 40 > deadline) break;
+        aborted = false;
+        chess.move(item.move);
+        const score = -negamax(3, 1, -MATE, MATE);
+        chess.undo();
+        if (aborted) break;
+        deeper.push({ move: item.move, score });
+      }
+      if (deeper.length === probe.length) picked = deeper;
+    }
+    if (picked.length > 0) {
+      picked.sort((a, b) => b.score - a.score);
+      finished = picked;
+    }
+  }
+
+  let chosen = finished[0].move;
+  if (noise > 0 && Math.random() < noise) {
+    if (noise >= 0.55 && Math.random() < 0.62) {
+      chosen = rootMoves[Math.floor(Math.random() * rootMoves.length)];
+    } else {
+      const slack = noise >= 0.55 ? 720 : noise >= 0.2 ? 280 : 110;
+      const pool = finished.filter(
+        (item) => item.score <= finished[0].score - 15 && item.score >= finished[0].score - slack,
+      );
+      if (pool.length > 0) chosen = pool[Math.floor(Math.random() * pool.length)].move;
+    }
   }
   return toEngine(chosen);
 }

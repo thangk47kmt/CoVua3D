@@ -103,6 +103,9 @@ function Home() {
                 Tiếp tục ván dở
               </button>
             )}
+            <Link to="/learn" className="btn" onClick={() => unlockAudio()}>
+              Tập chơi
+            </Link>
             <Link to="/hall" className="btn" onClick={() => unlockAudio()}>
               Vào sảnh thách đấu
             </Link>

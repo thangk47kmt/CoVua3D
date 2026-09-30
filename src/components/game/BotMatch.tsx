@@ -98,13 +98,13 @@ export function BotMatch({
       if (req.current !== id) return;
       req.current += 1;
       try {
-        const move = search(fen, Math.min(level.movetime, 420), level.noise, Math.min(level.depthCap, 2));
+        const move = search(fen, Math.min(level.movetime, 320), level.noise, Math.min(level.depthCap, 2));
         if (move) applyRef.current(move.from, move.to, move.promotion);
         else setWaiting(false);
       } catch {
         setWaiting(false);
       }
-    }, level.movetime + 900);
+    }, level.movetime + 1800);
     worker.postMessage({
       id,
       fen,

@@ -1,6 +1,6 @@
 type Kind = "move" | "capture" | "castle" | "check" | "promote" | "end" | "select" | "illegal";
 
-const THEMES = ["crystal", "rome", "anime", "sanguo", "ember", "tide", "aurora"] as const;
+const THEMES = ["crystal", "rome", "anime", "sanguo", "ember", "tide", "aurora", "nile", "frost", "neon", "viet", "sengoku", "classic"] as const;
 type ThemeId = (typeof THEMES)[number];
 
 const THEME_FX: Record<ThemeId, { rate: number; cut: number; root: number }> = {
@@ -11,11 +11,21 @@ const THEME_FX: Record<ThemeId, { rate: number; cut: number; root: number }> = {
   ember: { rate: 0.78, cut: 1100, root: 277 },
   tide: { rate: 1.05, cut: 2600, root: 349 },
   aurora: { rate: 1.1, cut: 3600, root: 415 },
+  nile: { rate: 0.88, cut: 1800, root: 370 },
+  frost: { rate: 0.96, cut: 2800, root: 392 },
+  neon: { rate: 1.18, cut: 6200, root: 494 },
+  viet: { rate: 0.9, cut: 2000, root: 349 },
+  sengoku: { rate: 0.94, cut: 2200, root: 311 },
+  classic: { rate: 1, cut: 3200, root: 392 },
 };
 
 let ctx: AudioContext | null = null;
 let master: GainNode | null = null;
+let musicBus: GainNode | null = null;
+let fxBus: GainNode | null = null;
 let muted = false;
+let musicVol = 1;
+let sfxVol = 1;
 let prefsLoaded = false;
 const listeners = new Set<() => void>();
 const clips = new Map<string, AudioBuffer>();
@@ -24,10 +34,27 @@ let bedTheme = "";
 let bedSource: AudioBufferSourceNode | null = null;
 let bedGain: GainNode | null = null;
 
+function clampVol(value: number): number {
+  if (!Number.isFinite(value)) return 1;
+  return Math.min(1, Math.max(0, value));
+}
+
 function loadPrefs(): void {
   if (prefsLoaded || typeof window === "undefined") return;
   prefsLoaded = true;
   muted = window.localStorage.getItem("celestial-mute") === "1";
+  const music = window.localStorage.getItem("celestial-music");
+  const sfx = window.localStorage.getItem("celestial-sfx");
+  if (music !== null) musicVol = clampVol(Number(music));
+  if (sfx !== null) sfxVol = clampVol(Number(sfx));
+}
+
+function applyBuses(): void {
+  if (!ctx || !master || !musicBus || !fxBus) return;
+  const now = ctx.currentTime;
+  master.gain.setTargetAtTime(muted ? 0.0001 : 0.85, now, 0.03);
+  musicBus.gain.setTargetAtTime(musicVol, now, 0.03);
+  fxBus.gain.setTargetAtTime(sfxVol, now, 0.02);
 }
 
 function emit(): void {
@@ -52,14 +79,39 @@ export function setMuted(next: boolean): void {
   loadPrefs();
   muted = next;
   window.localStorage.setItem("celestial-mute", next ? "1" : "0");
-  if (ctx && master) {
-    master.gain.setTargetAtTime(next ? 0.0001 : 0.85, ctx.currentTime, 0.03);
-  }
+  applyBuses();
+  emit();
+}
+
+export function musicVolume(): number {
+  loadPrefs();
+  return musicVol;
+}
+
+export function sfxVolume(): number {
+  loadPrefs();
+  return sfxVol;
+}
+
+export function setMusicVolume(value: number): void {
+  loadPrefs();
+  musicVol = clampVol(value);
+  window.localStorage.setItem("celestial-music", String(musicVol));
+  applyBuses();
+  emit();
+}
+
+export function setSfxVolume(value: number): void {
+  loadPrefs();
+  sfxVol = clampVol(value);
+  window.localStorage.setItem("celestial-sfx", String(sfxVol));
+  applyBuses();
   emit();
 }
 
 function themeId(): ThemeId {
   const saved = typeof window === "undefined" ? "crystal" : (window.localStorage.getItem("celestial-theme") ?? "crystal");
+  if (saved === "ember" || saved === "tide" || saved === "aurora") return "crystal";
   return (THEMES as readonly string[]).includes(saved) ? (saved as ThemeId) : "crystal";
 }
 
@@ -84,7 +136,7 @@ async function loadClip(url: string): Promise<AudioBuffer | null> {
 }
 
 async function ensureBed(): Promise<void> {
-  if (!ctx || !master) return;
+  if (!ctx || !master || !musicBus) return;
   const theme = themeId();
   if (bedTheme === theme && bedSource) return;
   const token = ++bedToken;
@@ -93,7 +145,7 @@ async function ensureBed(): Promise<void> {
   const now = ctx.currentTime;
   const nextGain = ctx.createGain();
   nextGain.gain.setValueAtTime(0.0001, now);
-  nextGain.connect(master);
+  nextGain.connect(musicBus);
   const source = ctx.createBufferSource();
   source.buffer = buffer;
   source.loop = true;
@@ -127,7 +179,13 @@ export function unlockAudio(): void {
   if (!ctx) {
     ctx = new Ctx({ latencyHint: "interactive" });
     master = ctx.createGain();
+    musicBus = ctx.createGain();
+    fxBus = ctx.createGain();
     master.gain.value = muted ? 0.0001 : 0.85;
+    musicBus.gain.value = musicVol;
+    fxBus.gain.value = sfxVol;
+    musicBus.connect(master);
+    fxBus.connect(master);
     master.connect(ctx.destination);
   }
   if (ctx.state === "suspended") void ctx.resume();
@@ -145,7 +203,7 @@ if (typeof window !== "undefined") {
 }
 
 function tone(freq: number, dur: number, type: OscillatorType, gainValue: number, delay = 0): void {
-  if (!ctx || !master || muted) return;
+  if (!ctx || !fxBus || muted || sfxVol <= 0.001) return;
   const start = ctx.currentTime + delay;
   const osc = ctx.createOscillator();
   const gain = ctx.createGain();
@@ -155,15 +213,15 @@ function tone(freq: number, dur: number, type: OscillatorType, gainValue: number
   gain.gain.exponentialRampToValueAtTime(Math.max(0.0002, gainValue), start + 0.012);
   gain.gain.exponentialRampToValueAtTime(0.0001, start + dur);
   osc.connect(gain);
-  gain.connect(master);
+  gain.connect(fxBus);
   osc.start(start);
   osc.stop(start + dur + 0.03);
 }
 
 function playClip(url: string, rate: number, cut: number, gainValue: number): void {
-  if (!ctx || !master || muted) return;
+  if (!ctx || !fxBus || muted || sfxVol <= 0.001) return;
   void loadClip(url).then((buffer) => {
-    if (!buffer || !ctx || !master || muted) return;
+    if (!buffer || !ctx || !fxBus || muted || sfxVol <= 0.001) return;
     const source = ctx.createBufferSource();
     source.buffer = buffer;
     source.playbackRate.value = rate;
@@ -174,7 +232,7 @@ function playClip(url: string, rate: number, cut: number, gainValue: number): vo
     gain.gain.value = gainValue;
     source.connect(filter);
     filter.connect(gain);
-    gain.connect(master);
+    gain.connect(fxBus);
     source.start();
   });
 }

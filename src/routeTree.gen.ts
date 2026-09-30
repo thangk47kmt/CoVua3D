@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as HallRouteImport } from './routes/hall'
+import { Route as LearnRouteImport } from './routes/learn'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as PlayRouteImport } from './routes/play'
 import { Route as MatchIdRouteImport } from './routes/match.$id'
@@ -24,6 +25,11 @@ const IndexRoute = IndexRouteImport.update({
 const HallRoute = HallRouteImport.update({
   id: '/hall',
   path: '/hall',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LearnRoute = LearnRouteImport.update({
+  id: '/learn',
+  path: '/learn',
   getParentRoute: () => rootRouteImport,
 } as any)
 const LoginRoute = LoginRouteImport.update({
@@ -50,6 +56,7 @@ const ApiAuthSplatRoute = ApiAuthSplatRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/hall': typeof HallRoute
+  '/learn': typeof LearnRoute
   '/login': typeof LoginRoute
   '/play': typeof PlayRoute
   '/match/$id': typeof MatchIdRoute
@@ -58,6 +65,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/hall': typeof HallRoute
+  '/learn': typeof LearnRoute
   '/login': typeof LoginRoute
   '/play': typeof PlayRoute
   '/match/$id': typeof MatchIdRoute
@@ -67,6 +75,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/hall': typeof HallRoute
+  '/learn': typeof LearnRoute
   '/login': typeof LoginRoute
   '/play': typeof PlayRoute
   '/match/$id': typeof MatchIdRoute
@@ -74,13 +83,16 @@ export interface FileRoutesById {
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/hall' | '/login' | '/play' | '/match/$id' | '/api/auth/$'
+  fullPaths:
+    '/' | '/hall' | '/learn' | '/login' | '/play' | '/match/$id' | '/api/auth/$'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/hall' | '/login' | '/play' | '/match/$id' | '/api/auth/$'
+  to:
+    '/' | '/hall' | '/learn' | '/login' | '/play' | '/match/$id' | '/api/auth/$'
   id:
     | '__root__'
     | '/'
     | '/hall'
+    | '/learn'
     | '/login'
     | '/play'
     | '/match/$id'
@@ -90,6 +102,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   HallRoute: typeof HallRoute
+  LearnRoute: typeof LearnRoute
   LoginRoute: typeof LoginRoute
   PlayRoute: typeof PlayRoute
   MatchIdRoute: typeof MatchIdRoute
@@ -110,6 +123,13 @@ declare module '@tanstack/react-router' {
       path: '/hall'
       fullPath: '/hall'
       preLoaderRoute: typeof HallRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/learn': {
+      id: '/learn'
+      path: '/learn'
+      fullPath: '/learn'
+      preLoaderRoute: typeof LearnRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/login': {
@@ -146,6 +166,7 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   HallRoute: HallRoute,
+  LearnRoute: LearnRoute,
   LoginRoute: LoginRoute,
   PlayRoute: PlayRoute,
   MatchIdRoute: MatchIdRoute,

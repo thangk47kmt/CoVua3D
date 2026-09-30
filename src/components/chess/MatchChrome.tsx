@@ -1,28 +1,101 @@
-import { useEffect, useState, useSyncExternalStore, type ReactNode } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import { Link } from "@tanstack/react-router";
 import { ArrowLeft, Flag, Handshake, RotateCw, Undo2, Volume2, VolumeX } from "lucide-react";
-import { hydrateMute, isMuted, playFx, setMuted, subscribeMute, unlockAudio } from "@/game/audio";
+import {
+  hydrateMute,
+  isMuted,
+  musicVolume,
+  playFx,
+  setMusicVolume,
+  setMuted,
+  setSfxVolume,
+  sfxVolume,
+  subscribeMute,
+  unlockAudio,
+} from "@/game/audio";
 import { capturedSets, moveRows } from "@/game/notation";
 import { srcForGlyph, srcForPiece, usePieceSet } from "./pieceArt";
 import { ThemePicker } from "./ThemePicker";
 
 export function SoundButton() {
   const muted = useSyncExternalStore(subscribeMute, isMuted, () => false);
+  const music = useSyncExternalStore(subscribeMute, musicVolume, () => 1);
+  const sfx = useSyncExternalStore(subscribeMute, sfxVolume, () => 1);
+  const [open, setOpen] = useState(false);
+  const box = useRef<HTMLDivElement>(null);
   useEffect(() => {
     hydrateMute();
   }, []);
+  useEffect(() => {
+    if (!open) return;
+    const close = (event: PointerEvent) => {
+      if (!box.current?.contains(event.target as Node)) setOpen(false);
+    };
+    window.addEventListener("pointerdown", close);
+    return () => window.removeEventListener("pointerdown", close);
+  }, [open]);
+  const silent = muted || (music <= 0.001 && sfx <= 0.001);
   return (
-    <button
-      type="button"
-      className="btn btn-ghost min-w-11 px-3"
-      aria-label={muted ? "Bật tiếng" : "Tắt tiếng"}
-      onClick={() => {
-        unlockAudio();
-        setMuted(!isMuted());
-      }}
-    >
-      {muted ? <VolumeX size={18} /> : <Volume2 size={18} />}
-    </button>
+    <div className="relative" ref={box}>
+      <button
+        type="button"
+        className="btn btn-ghost min-w-11 px-3"
+        aria-expanded={open}
+        aria-label="Chỉnh âm lượng"
+        onClick={() => {
+          unlockAudio();
+          setOpen((value) => !value);
+        }}
+      >
+        {silent ? <VolumeX size={18} /> : <Volume2 size={18} />}
+      </button>
+      {open && (
+        <div className="absolute top-full right-0 z-40 mt-2 w-56 rounded-xl border border-line bg-[#100c18]/95 p-3 text-left shadow-lg backdrop-blur">
+          <label className="block text-xs tracking-[0.14em] text-muted uppercase">
+            Nhạc nền
+            <input
+              className="vol-slider mt-1"
+              type="range"
+              min={0}
+              max={100}
+              value={Math.round(music * 100)}
+              aria-valuetext={`${Math.round(music * 100)}%`}
+              onChange={(event) => {
+                unlockAudio();
+                if (muted) setMuted(false);
+                setMusicVolume(Number(event.target.value) / 100);
+              }}
+            />
+          </label>
+          <label className="mt-3 block text-xs tracking-[0.14em] text-muted uppercase">
+            Hiệu ứng
+            <input
+              className="vol-slider mt-1"
+              type="range"
+              min={0}
+              max={100}
+              value={Math.round(sfx * 100)}
+              aria-valuetext={`${Math.round(sfx * 100)}%`}
+              onChange={(event) => {
+                unlockAudio();
+                if (muted) setMuted(false);
+                setSfxVolume(Number(event.target.value) / 100);
+              }}
+            />
+          </label>
+          <button
+            type="button"
+            className="btn btn-ghost mt-3 w-full"
+            onClick={() => {
+              unlockAudio();
+              setMuted(!muted);
+            }}
+          >
+            {muted ? "Bật tiếng" : "Tắt hết"}
+          </button>
+        </div>
+      )}
+    </div>
   );
 }
 

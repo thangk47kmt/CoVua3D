@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { themeById } from "./themes";
+import { readSavedTheme, themeById } from "./themes";
 
 const GLYPH: Record<string, string> = {
   "♙": "wP",
@@ -14,7 +14,7 @@ const GLYPH: Record<string, string> = {
   "♛": "bQ",
 };
 
-export type PieceSetId = "crystal" | "anime" | "sanguo" | "ember" | "tide" | "aurora" | "rome";
+export type PieceSetId = "crystal" | "anime" | "sanguo" | "ember" | "tide" | "aurora" | "rome" | "nile" | "frost" | "neon" | "viet" | "sengoku" | "classic";
 
 const KEYS = ["wK", "wQ", "wR", "wB", "wN", "wP", "bK", "bQ", "bR", "bB", "bN", "bP"] as const;
 
@@ -32,7 +32,7 @@ export function pieceSetMap(set: PieceSetId): Record<PieceKey, string> {
 }
 
 export const ALL_PIECE_TEXTURES: Record<string, string> = {};
-for (const set of ["crystal", "anime", "sanguo", "ember", "tide", "aurora", "rome"] as const) {
+for (const set of ["crystal", "anime", "sanguo", "ember", "tide", "aurora", "rome", "nile", "frost", "neon", "viet", "sengoku", "classic"] as const) {
   for (const key of KEYS) ALL_PIECE_TEXTURES[`${set}-${key}`] = fileFor(set, key);
 }
 
@@ -50,8 +50,7 @@ export function usePieceSet(): PieceSetId {
   const [set, setSet] = useState<PieceSetId>("crystal");
   useEffect(() => {
     const read = () => {
-      const saved = localStorage.getItem("celestial-theme") ?? "crystal";
-      setSet(themeById(saved).pieces);
+      setSet(themeById(readSavedTheme()).pieces);
     };
     read();
     window.addEventListener("celestial-theme", read);
