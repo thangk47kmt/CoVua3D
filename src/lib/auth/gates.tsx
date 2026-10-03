@@ -4,6 +4,7 @@ import { GROK_PROVIDERS, authEnabled, signIn, signOut } from "./client";
 import { hasGateSessionMarker } from "./gate-session-marker";
 import { resolveSignInGateState } from "./sign-in-gate";
 import { useCurrentUser, useCurrentUserState } from "./use-current-user";
+import { useT } from "@/i18n";
 
 const subscribeToNothing = () => () => {};
 const noGateSessionOnServer = () => false;
@@ -89,6 +90,7 @@ export function SignInButtons() {
  */
 export function UserButton() {
   const user = useCurrentUser();
+  const { t } = useT();
   // Sign-out can take a moment (and can fail when deployed), so the control
   // shows it is working and cannot be fired twice.
   const [signingOut, setSigningOut] = useState(false);
@@ -124,7 +126,7 @@ export function UserButton() {
           }}
           className="cursor-pointer text-sm underline-offset-4 opacity-70 hover:underline disabled:cursor-wait disabled:no-underline"
         >
-          {signingOut ? "Signing out…" : "Sign out"}
+          {signingOut ? t("signingOut") : t("signOut")}
         </button>
       )}
     </div>

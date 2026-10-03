@@ -3,14 +3,17 @@ import { Link } from "@tanstack/react-router";
 import { Chess } from "chess.js";
 import { ClientBoard } from "@/components/chess/ClientBoard";
 import { MatchChrome, MoveHelper, PromotionDialog, SoundButton } from "@/components/chess/MatchChrome";
+import { LanguageButton } from "@/components/chess/LanguagePicker";
 import { playFx, unlockAudio } from "@/game/audio";
-import { pieceName, bridgeAnim, type BoardAnim } from "@/game/notation";
+import { bridgeAnim, type BoardAnim } from "@/game/notation";
 import { asSquare, kingSquare, outcome } from "@/game/rules";
 import { answerDraw, getGame, offerDraw, playMove, resignGame, type GameView } from "@/lib/hall";
+import { formatStatus, getLang, pieceLabel, translate, useT } from "@/i18n";
 
 const START = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
 
 export function OnlineMatch({ id }: { id: string }) {
+  const { t } = useT();
   const [view, setView] = useState<GameView | null>(null);
   const [missing, setMissing] = useState(false);
   const [shown, setShown] = useState<string | null>(null);
@@ -35,7 +38,7 @@ export function OnlineMatch({ id }: { id: string }) {
         setView(game);
       }
     } catch {
-      setError("Mất kết nối với sảnh. Đang thử lại…");
+      setError(translate(getLang(), "matchLost"));
     }
   }
 
@@ -106,7 +109,7 @@ export function OnlineMatch({ id }: { id: string }) {
       move = preview.move({ from: asSquare(from), to: asSquare(to), promotion });
     } catch {
       playFx("illegal");
-      setError("Nước đi không hợp lệ.");
+      setError(translate(getLang(), "illegalMove"));
       return;
     }
     setBusy(true);
@@ -163,12 +166,12 @@ export function OnlineMatch({ id }: { id: string }) {
     : !selected
       ? origins(fen, turn).map((move) => ({
           id: move.from,
-          label: `${pieceName(move.piece)} ${move.from}`,
+          label: `${pieceLabel(t, move.piece)} ${move.from}`,
           onClick: () => onSquare(move.from),
         }))
       : legal.map((dot) => ({
           id: dot.to,
-          label: dot.capture ? `Bắt ${dot.to}` : dot.to,
+          label: dot.capture ? t("captureSq", { sq: dot.to }) : dot.to,
           onClick: () => onSquare(dot.to),
         }));
 
@@ -181,15 +184,15 @@ export function OnlineMatch({ id }: { id: string }) {
   const drawOutgoing = Boolean(view?.drawOffer && view.youAre !== "spectator" && view.drawOffer === (view.youAre === "w" ? view.whiteId : view.blackId));
 
   if (!view && !missing) {
-    return <div className="grid h-dvh place-items-center text-muted">Đang mở ván đấu…</div>;
+    return <div className="grid h-dvh place-items-center text-muted">{t("openingMatch")}</div>;
   }
   if (missing || !view) {
     return (
       <div className="grid h-dvh place-items-center p-6 text-center">
         <div>
-          <h1 className="text-2xl">Không thấy ván này</h1>
+          <h1 className="text-2xl">{t("gameMissing")}</h1>
           <Link to="/hall" className="btn btn-gold mt-4">
-            Về sảnh
+            {t("backHome")}
           </Link>
         </div>
       </div>
@@ -198,24 +201,25 @@ export function OnlineMatch({ id }: { id: string }) {
 
   const status =
     view.status === "finished"
-      ? finishedText(view)
+      ? finishedText(view, t)
       : view.youAre === "spectator"
-        ? `Đang xem · ${report.text}`
+        ? t("watchLine", { status: formatStatus(t, report, boardChess.turn()) })
         : myTurn
-          ? "Đến lượt bạn"
-          : report.text;
+          ? t("yourTurn")
+          : formatStatus(t, report, boardChess.turn());
 
   return (
     <div className="grid h-dvh min-w-0 grid-cols-[minmax(0,1fr)] grid-rows-[auto_minmax(0,1fr)_auto] overflow-hidden lg:grid-cols-[minmax(0,1fr)_22rem] lg:grid-rows-[auto_minmax(0,1fr)]">
       <header className="flex items-center justify-between gap-3 border-b border-line px-4 py-3 lg:col-span-2">
         <div>
           <p className="text-xs tracking-[0.2em] text-gold uppercase">
-            {view.youAre === "spectator" ? "Đang xem" : "Thách đấu"}
+            {view.youAre === "spectator" ? t("watching") : t("challenge")}
           </p>
           <h1 className="text-xl">
             {view.whiteName} <span className="text-muted">/</span> {view.blackName}
           </h1>
         </div>
+        <LanguageButton />
         <SoundButton />
       </header>
       <div className="relative h-full min-h-0 min-w-0">
@@ -237,7 +241,7 @@ export function OnlineMatch({ id }: { id: string }) {
         {confirmResign && (
           <div className="absolute inset-0 z-20 grid place-items-center bg-bg/70 p-4">
             <div className="panel w-full max-w-sm p-4">
-              <h2 className="text-xl">Xin thua ván này?</h2>
+              <h2 className="text-xl">{t("resignOnline")}</h2>
               <div className="mt-3 flex gap-2">
                 <button
                   type="button"
@@ -248,10 +252,10 @@ export function OnlineMatch({ id }: { id: string }) {
                     playFx("end");
                   }}
                 >
-                  Xin thua
+                  {t("resignConfirm")}
                 </button>
                 <button type="button" className="btn btn-gold flex-1" onClick={() => setConfirmResign(false)}>
-                  Chơi tiếp
+                  {t("keepPlaying")}
                 </button>
               </div>
             </div>
@@ -259,7 +263,7 @@ export function OnlineMatch({ id }: { id: string }) {
         )}
       </div>
       <MatchChrome
-        kicker={view.youAre === "w" ? "Bạn cầm Trắng" : view.youAre === "b" ? "Bạn cầm Đen" : "Khán giả"}
+        kicker={view.youAre === "w" ? t("youHoldWhite") : view.youAre === "b" ? t("youHoldBlack") : t("spectator")}
         status={status}
         whiteName={view.whiteName}
         blackName={view.blackName}
@@ -271,7 +275,7 @@ export function OnlineMatch({ id }: { id: string }) {
         onResign={view.youAre !== "spectator" && view.status === "playing" ? () => setConfirmResign(true) : undefined}
         onOfferDraw={view.youAre !== "spectator" && view.status === "playing" && !view.drawOffer ? () => void offerDraw({ data: id }).then(() => pull()) : undefined}
         drawHint={
-          drawIncoming ? "Đối thủ xin hòa." : drawOutgoing ? "Đã gửi lời xin hòa." : scrub !== null ? "Bạn đang xem lại nước đi." : null
+          drawIncoming ? t("drawAsk") : drawOutgoing ? t("drawSent") : scrub !== null ? t("reviewing") : null
         }
         onAcceptDraw={drawIncoming ? () => void answerDraw({ data: { gameId: id, accept: true } }).then(() => pull()) : undefined}
         onDeclineDraw={drawIncoming ? () => void answerDraw({ data: { gameId: id, accept: false } }).then(() => pull()) : undefined}
@@ -296,7 +300,7 @@ export function OnlineMatch({ id }: { id: string }) {
               setShown(view.fen);
             }}
           >
-            Trở lại trực tiếp
+            {t("backLive")}
           </button>
         )}
         <MoveHelper buttons={helper} />
@@ -335,11 +339,11 @@ function soundForSan(anim: BoardAnim) {
   else playFx("move", anim.piece);
 }
 
-function finishedText(view: GameView): string {
+function finishedText(view: GameView, t: (key: "blackResigned" | "whiteResigned" | "mateWhite" | "mateBlack" | "drawWord" | "gameOver") => string): string {
   if (view.reason === "resign") {
-    return view.result === "1-0" ? "Đen xin thua — Trắng thắng" : "Trắng xin thua — Đen thắng";
+    return view.result === "1-0" ? t("blackResigned") : t("whiteResigned");
   }
-  if (view.reason === "checkmate") return view.result === "1-0" ? "Chiếu hết — Trắng thắng" : "Chiếu hết — Đen thắng";
-  if (view.reason === "draw" || view.result === "1/2-1/2") return "Hòa";
-  return "Ván đã kết thúc";
+  if (view.reason === "checkmate") return view.result === "1-0" ? t("mateWhite") : t("mateBlack");
+  if (view.reason === "draw" || view.result === "1/2-1/2") return t("drawWord");
+  return t("gameOver");
 }

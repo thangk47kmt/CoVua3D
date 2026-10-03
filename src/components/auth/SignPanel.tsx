@@ -1,6 +1,8 @@
 import { GROK_PROVIDERS, signIn } from "@/lib/auth/client";
+import { useT } from "@/i18n";
 
 export function SignPanel({ callback = "/" }: { callback?: string }) {
+  const { t } = useT();
   return (
     <div className="flex w-full max-w-sm flex-col gap-2">
       {GROK_PROVIDERS.map((provider) => (
@@ -10,7 +12,7 @@ export function SignPanel({ callback = "/" }: { callback?: string }) {
           className="btn btn-gold"
           onClick={() => signIn(provider.providerId, { callbackURL: callback })}
         >
-          Tiếp tục với {provider.label}
+          {t("continueWith", { name: provider.label })}
         </button>
       ))}
     </div>

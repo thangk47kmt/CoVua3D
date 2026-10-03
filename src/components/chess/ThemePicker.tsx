@@ -1,9 +1,11 @@
 import { useEffect, useState } from "react";
 import { TINTS, THEMES, readSavedTheme, readSavedTint, type TintId } from "./themes";
+import { themeLabel, tintLabel, useT } from "@/i18n";
 
 const FEATURED = new Set(["crystal", "viet", "sanguo"]);
 
 export function ThemePicker() {
+  const { t } = useT();
   const [themeId, setThemeId] = useState("crystal");
   const [tint, setTint] = useState<TintId>("none");
   const [more, setMore] = useState(false);
@@ -45,27 +47,27 @@ export function ThemePicker() {
 
   return (
     <div>
-      <p className="text-xs tracking-[0.16em] text-muted uppercase">Kiểu quân</p>
+      <p className="text-xs tracking-[0.16em] text-muted uppercase">{t("piecesLabel")}</p>
       <div className="mt-2 flex gap-2 overflow-x-auto pb-1">
         {featured.map((item) => (
           <button key={item.id} type="button" className="chip shrink-0" data-on={themeId === item.id} onClick={() => chooseTheme(item.id)}>
-            {item.name}
+            {themeLabel(t, item.id, item.name)}
           </button>
         ))}
         {shown.map((item) => (
           <button key={item.id} type="button" className="chip shrink-0" data-on={themeId === item.id} onClick={() => chooseTheme(item.id)}>
-            {item.name}
+            {themeLabel(t, item.id, item.name)}
           </button>
         ))}
         <button type="button" className="chip shrink-0" data-on={more} onClick={() => setMore((value) => !value)}>
-          {more ? "Thu gọn" : "Thêm"}
+          {more ? t("fewerThemes") : t("moreThemes")}
         </button>
       </div>
-      <p className="mt-3 text-xs tracking-[0.16em] text-muted uppercase">Hiệu ứng màu</p>
+      <p className="mt-3 text-xs tracking-[0.16em] text-muted uppercase">{t("colorEffect")}</p>
       <div className="mt-2 flex gap-2 overflow-x-auto pb-1">
         {TINTS.map((item) => (
           <button key={item.id} type="button" className="chip shrink-0" data-on={tint === item.id} onClick={() => chooseTint(item.id)}>
-            {item.name}
+            {tintLabel(t, item.id, item.name)}
           </button>
         ))}
       </div>

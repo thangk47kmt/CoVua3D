@@ -140,7 +140,7 @@ async function ensureBed(): Promise<void> {
   const theme = themeId();
   if (bedTheme === theme && bedSource) return;
   const token = ++bedToken;
-  const buffer = await loadClip(`/audio/music/${theme}.wav`);
+  const buffer = await loadClip(`/audio/music/${theme}.mp3`);
   if (!ctx || !master || token !== bedToken || !buffer) return;
   const now = ctx.currentTime;
   const nextGain = ctx.createGain();

@@ -3,9 +3,12 @@ import { Link } from "@tanstack/react-router";
 import { Chess } from "chess.js";
 import { ClientBoard } from "@/components/chess/ClientBoard";
 import { PromotionDialog, SoundButton } from "@/components/chess/MatchChrome";
+import { LanguageButton } from "@/components/chess/LanguagePicker";
 import { playFx, unlockAudio } from "@/game/audio";
 import { LESSONS, type Lesson } from "@/game/lessons";
 import { asSquare, kingSquare } from "@/game/rules";
+import { getLang, translate, useT } from "@/i18n";
+import { localizeLesson } from "@/i18n/lessons";
 
 type Promo = { from: string; to: string };
 
@@ -20,6 +23,7 @@ function goalMet(lesson: Lesson, from: string, to: string, promotion?: string): 
 }
 
 export function PracticeDesk() {
+  const { t, lesson: localize } = useT();
   const [index, setIndex] = useState(0);
   const [free, setFree] = useState(false);
   const lesson = LESSONS[index] ?? LESSONS[0]!;
@@ -73,7 +77,7 @@ export function PracticeDesk() {
   function openFree() {
     setFree(true);
     setDone(false);
-    setNote("Đi cả hai bên. Bàn không có đối thủ — dùng để thử ý và quay lại nước vừa đi.");
+    setNote(null);
     load(START);
     try {
       localStorage.setItem("celestial-lesson", JSON.stringify({ index, free: true }));
@@ -88,7 +92,7 @@ export function PracticeDesk() {
       playFx("illegal");
       setSelected(null);
       setPromo(null);
-      setNote(lesson.hint);
+      setNote(localizeLesson(getLang(), lesson).hint);
       return;
     }
     let move;
@@ -96,7 +100,7 @@ export function PracticeDesk() {
       move = chess.move({ from: asSquare(from), to: asSquare(to), promotion });
     } catch {
       playFx("illegal");
-      setNote("Nước đó không hợp lệ.");
+      setNote(translate(getLang(), "illegalMove"));
       return;
     }
     if (move.san.includes("#")) playFx("check", move.piece);
@@ -111,9 +115,9 @@ export function PracticeDesk() {
     setPromo(null);
     if (!free) {
       setDone(true);
-      setNote(lesson.success);
+      setNote(localizeLesson(getLang(), lesson).success);
     } else {
-      setNote(chess.isGameOver() ? "Ván tập đã kết thúc. Xếp lại để đi tiếp." : null);
+      setNote(chess.isGameOver() ? translate(getLang(), "practiceOver") : null);
     }
   }
 
@@ -165,19 +169,21 @@ export function PracticeDesk() {
     }));
   }, [interactive, selected, fen, stamp]);
   const checkSquare = chess.inCheck() ? kingSquare(chess, chess.turn()) : null;
-  const turnLabel = chess.turn() === "w" ? "Lượt Trắng" : "Lượt Đen";
+  const turnLabel = chess.turn() === "w" ? t("turnWhite") : t("turnBlack");
+  const shown = localize(lesson);
 
   return (
     <div className="grid h-dvh min-w-0 grid-cols-[minmax(0,1fr)] grid-rows-[auto_minmax(0,1fr)_auto] overflow-hidden lg:grid-cols-[minmax(0,1fr)_22rem] lg:grid-rows-[auto_minmax(0,1fr)]">
       <header className="flex items-center justify-between gap-3 border-b border-line px-4 py-3 lg:col-span-2">
         <div>
           <p className="text-xs tracking-[0.2em] text-gold uppercase">Celestial Crystal</p>
-          <h1 className="text-xl">Tập chơi</h1>
+          <h1 className="text-xl">{t("practiceTitle")}</h1>
         </div>
         <div className="flex items-center gap-2">
           <Link to="/" className="btn">
-            Về sảnh
+            {t("backHome")}
           </Link>
+          <LanguageButton />
           <SoundButton />
         </div>
       </header>
@@ -205,61 +211,59 @@ export function PracticeDesk() {
         <div className="flex gap-2 overflow-x-auto pb-1">
           {LESSONS.map((item, i) => (
             <button key={item.id} type="button" className="chip shrink-0" data-on={!free && i === index} onClick={() => openLesson(i)}>
-              {i + 1}. {item.title}
+              {i + 1}. {localize(item).title}
             </button>
           ))}
           <button type="button" className="chip shrink-0" data-on={free} onClick={openFree}>
-            Tập tự do
+            {t("freePlay")}
           </button>
         </div>
         {free ? (
           <>
             <p className="mt-3 text-xs tracking-[0.16em] text-gold uppercase">{turnLabel}</p>
-            <h2 className="mt-1 text-lg">Tập tự do</h2>
-            <p className="mt-2 text-sm text-muted">
-              Đi thay cả hai bên trên một bàn đủ quân. Dùng khi muốn thử nhập thành, phong cấp, hoặc một thế cờ vừa đọc.
-            </p>
+            <h2 className="mt-1 text-lg">{t("freePlay")}</h2>
+            <p className="mt-2 text-sm text-muted">{t("freeLead")}</p>
             <p className="mt-2 text-sm">{note}</p>
             <div className="mt-3 flex flex-wrap gap-2">
               <button type="button" className="btn" onClick={undo}>
-                Lùi một nước
+                {t("undoMove")}
               </button>
               <button type="button" className="btn" onClick={() => load(START)}>
-                Xếp lại
+                {t("resetPos")}
               </button>
             </div>
           </>
         ) : (
           <>
             <p className="mt-3 text-xs tracking-[0.16em] text-gold uppercase">
-              Bài {index + 1}/{LESSONS.length}
+              {t("lessonProgress", { n: index + 1, total: LESSONS.length })}
               {lesson.readOnly ? "" : ` · ${turnLabel}`}
             </p>
-            <h2 className="mt-1 text-lg">{lesson.title}</h2>
-            <p className="mt-2 text-sm">{lesson.lead}</p>
+            <h2 className="mt-1 text-lg">{shown.title}</h2>
+            <p className="mt-2 text-sm">{shown.lead}</p>
             <ul className="mt-2 list-disc space-y-1 pl-4 text-sm text-muted">
-              {lesson.points.map((point) => (
+              {shown.points.map((point) => (
                 <li key={point}>{point}</li>
               ))}
             </ul>
             {note && <p className={`mt-3 text-sm ${done ? "text-gold" : "text-fg"}`}>{note}</p>}
             <div className="mt-3 flex flex-wrap gap-2">
               <button type="button" className="btn" disabled={index === 0} onClick={() => openLesson(index - 1)}>
-                Bài trước
+                {t("prev")}
               </button>
               {!lesson.readOnly && (
                 <button type="button" className="btn" onClick={() => load(lesson.fen)}>
-                  Làm lại
+                  {t("again")}
                 </button>
               )}
               {(lesson.readOnly || done) && index < LESSONS.length - 1 && (
                 <button type="button" className="btn btn-gold" onClick={() => openLesson(index + 1)}>
-                  Bài tiếp
+                  {t("next")}
                 </button>
               )}
               {(lesson.readOnly || done) && index === LESSONS.length - 1 && (
                 <button type="button" className="btn btn-gold" onClick={openFree}>
-                  Tập tự do
+                  {t("freePlay")}
                 </button>
               )}
             </div>

@@ -54,10 +54,11 @@ function puff(): CanvasTexture {
 
 function nebulaSky(): CanvasTexture {
   const canvas = document.createElement("canvas");
-  canvas.width = 2048;
-  canvas.height = 1024;
+  canvas.width = 1024;
+  canvas.height = 512;
   const ctx = canvas.getContext("2d");
   if (ctx) {
+    ctx.scale(0.5, 0.5);
     const sky = ctx.createLinearGradient(0, 0, 0, 1024);
     sky.addColorStop(0, "#050714");
     sky.addColorStop(0.42, "#120c2e");
@@ -404,14 +405,14 @@ function GalaxyWorld({ theme }: { theme: BoardTheme }) {
       <Stars count={180} color="#e7f1ff" radius={58} />
       <Stars count={28} color="#ffe3a4" radius={46} />
       <mesh raycast={() => null}>
-        <sphereGeometry args={[90, 48, 32]} />
+        <sphereGeometry args={[90, 32, 20]} />
         <meshBasicMaterial map={sky} side={BackSide} />
       </mesh>
       <group ref={planets}>
         {planetPos.map((p, i) => (
           <group key={i} position={[p[0], p[1], p[2]]}>
             <mesh raycast={() => null}>
-              <sphereGeometry args={[p[3], 24, 18]} />
+              <sphereGeometry args={[p[3], 16, 12]} />
               <meshStandardMaterial map={skins[i]} roughness={0.55} metalness={0.12} emissive={i === 2 ? "#e4c27a" : "#6a88c8"} emissiveIntensity={0.12} />
             </mesh>
             <Billboard>

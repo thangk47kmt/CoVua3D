@@ -2,10 +2,11 @@ import { useEffect, useState } from "react";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { Copy, Eye, Swords, UserPlus } from "lucide-react";
 import { SoundButton } from "@/components/chess/MatchChrome";
-import { resultLabel } from "@/game/notation";
+import { LanguageButton } from "@/components/chess/LanguagePicker";
 import { UserButton } from "@/lib/auth/gates";
 import { clearGuest, writeGuest } from "@/lib/hall-identity";
 import { useHallIdentity } from "@/components/hall/use-hall-identity";
+import { formatResult, getLang, translate, useT } from "@/i18n";
 import {
   addFriend,
   answerChallenge,
@@ -18,6 +19,7 @@ import {
 } from "@/lib/hall";
 
 export function HallView() {
+  const { t } = useT();
   const { real, guest } = useHallIdentity();
   const navigate = useNavigate();
   const [snap, setSnap] = useState<HallSnapshot | null>(null);
@@ -45,7 +47,7 @@ export function HallView() {
           setName((current) => current || next.profile.displayName);
         }
       } catch {
-        if (!stop) setError("Sảnh chưa mở được. Thử lại sau giây lát.");
+        if (!stop) setError(translate(getLang(), "hallDown"));
       }
     };
     void tick();
@@ -62,17 +64,17 @@ export function HallView() {
     setNotice("");
     try {
       const result = await task();
-      if (!result.ok) setError(result.error ?? "Không thực hiện được.");
+      if (!result.ok) setError(result.error ?? translate(getLang(), "cannot"));
       else if (enter && result.gameId) {
         void navigate({ to: "/match/$id", params: { id: result.gameId } });
         return;
-      } else setNotice("Đã cập nhật.");
+      } else setNotice(translate(getLang(), "updated"));
       if (guest && name.trim().length >= 2) {
         writeGuest({ userId: guest.userId, displayName: name.trim().slice(0, 24) });
       }
       await refresh();
     } catch {
-      setError("Có lỗi khi nói chuyện với sảnh.");
+      setError(translate(getLang(), "hallError"));
     } finally {
       setBusy(false);
     }
@@ -83,12 +85,13 @@ export function HallView() {
       <header className="flex items-center justify-between gap-3">
         <div>
           <p className="text-xs tracking-[0.22em] text-gold uppercase">Celestial Crystal</p>
-          <h1 className="text-3xl">Sảnh thách đấu</h1>
+          <h1 className="text-3xl">{t("hallTitle")}</h1>
         </div>
         <div className="flex items-center gap-2">
           <Link to="/" className="btn btn-ghost">
-            Đấu với tinh tú
+            {t("versusBot")}
           </Link>
+          <LanguageButton />
           <SoundButton />
           {real ? (
             <UserButton />
@@ -102,7 +105,7 @@ export function HallView() {
                   window.location.assign("/hall");
                 }}
               >
-                Rời sảnh
+                {t("leaveHall")}
               </button>
             )
           )}
@@ -111,40 +114,40 @@ export function HallView() {
       {error && <p className="text-sm text-danger">{error}</p>}
       {notice && <p className="text-sm text-ok">{notice}</p>}
       {!snap ? (
-        <p className="text-muted">Đang gọi các tinh tú trong sảnh…</p>
+        <p className="text-muted">{t("hallWait")}</p>
       ) : (
         <>
           <section className="panel grid gap-3 p-4 sm:grid-cols-[1fr_auto] sm:items-end">
             <label className="block">
-              <span className="text-xs tracking-[0.14em] text-muted uppercase">Tên trong sảnh</span>
+              <span className="text-xs tracking-[0.14em] text-muted uppercase">{t("hallName")}</span>
               <input className="field mt-2" value={name} maxLength={24} onChange={(event) => setName(event.target.value)} />
             </label>
             <button type="button" className="btn" disabled={busy} onClick={() => void act(() => renameProfile({ data: name }))}>
-              Lưu tên
+              {t("saveName")}
             </button>
             <div className="sm:col-span-2">
-              <p className="text-xs tracking-[0.14em] text-muted uppercase">Mã bạn bè</p>
+              <p className="text-xs tracking-[0.14em] text-muted uppercase">{t("friendCode")}</p>
               <div className="mt-2 flex flex-wrap items-center gap-2">
                 <p className="font-display text-2xl tracking-[0.28em] text-gold">{snap.profile.friendCode}</p>
                 <button
                   type="button"
                   className="btn"
-                  onClick={() => void navigator.clipboard?.writeText(snap.profile.friendCode).then(() => setNotice("Đã chép mã.")).catch(() => setNotice(snap.profile.friendCode))}
+                  onClick={() => void navigator.clipboard?.writeText(snap.profile.friendCode).then(() => setNotice(t("copied"))).catch(() => setNotice(snap.profile.friendCode))}
                 >
-                  <Copy size={16} /> Chép mã
+                  <Copy size={16} /> {t("copyCode")}
                 </button>
               </div>
             </div>
           </section>
 
           <section className="panel p-4">
-            <h2 className="text-xl">Lời thách đấu</h2>
+            <h2 className="text-xl">{t("challenges")}</h2>
             <div className="mt-3 flex flex-wrap gap-2">
               {(
                 [
-                  ["random", "Màu ngẫu nhiên"],
-                  ["white", "Bạn cầm Trắng"],
-                  ["black", "Bạn cầm Đen"],
+                  ["random", t("randomColor")],
+                  ["white", t("youHoldWhite")],
+                  ["black", t("youHoldBlack")],
                 ] as const
               ).map(([value, label]) => (
                 <button key={value} type="button" className="chip" data-on={color === value} onClick={() => setColor(value)}>
@@ -153,32 +156,32 @@ export function HallView() {
               ))}
             </div>
             <ul className="mt-3 space-y-2">
-              {snap.challenges.length === 0 && <li className="text-sm text-muted">Chưa có lời thách đấu.</li>}
+              {snap.challenges.length === 0 && <li className="text-sm text-muted">{t("noChallenges")}</li>}
               {snap.challenges.map((item) => (
                 <li key={item.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-line px-3 py-2">
                   <p>
                     {item.incoming ? item.fromName : item.toName}
-                    <span className="text-muted"> · {item.status === "accepted" ? "đã nhận" : item.incoming ? "thách bạn" : "bạn đã gửi"}</span>
+                    <span className="text-muted"> · {item.status === "accepted" ? t("accepted") : item.incoming ? t("theyChallenge") : t("youSentCh")}</span>
                   </p>
                   <div className="flex gap-2">
                     {item.gameId && (
                       <Link to="/match/$id" params={{ id: item.gameId }} className="btn btn-gold">
-                        Vào bàn
+                        {t("enterTable")}
                       </Link>
                     )}
                     {item.status === "pending" && item.incoming && (
                       <>
                         <button type="button" className="btn btn-gold" disabled={busy} onClick={() => void act(() => answerChallenge({ data: { challengeId: item.id, accept: true } }), true)}>
-                          Nhận
+                          {t("accept")}
                         </button>
                         <button type="button" className="btn" disabled={busy} onClick={() => void act(() => answerChallenge({ data: { challengeId: item.id, accept: false } }))}>
-                          Từ chối
+                          {t("decline")}
                         </button>
                       </>
                     )}
                     {item.status === "pending" && !item.incoming && (
                       <button type="button" className="btn" disabled={busy} onClick={() => void act(() => cancelChallenge({ data: item.id }))}>
-                        Hủy
+                        {t("cancel")}
                       </button>
                     )}
                   </div>
@@ -188,17 +191,17 @@ export function HallView() {
           </section>
 
           <section className="panel p-4">
-            <h2 className="text-xl">Ván của bạn</h2>
+            <h2 className="text-xl">{t("yourGames")}</h2>
             <ul className="mt-3 space-y-2">
-              {snap.myGames.length === 0 && <li className="text-sm text-muted">Bạn chưa có ván nào. Hãy thách một người trong sảnh.</li>}
+              {snap.myGames.length === 0 && <li className="text-sm text-muted">{t("noYourGames")}</li>}
               {snap.myGames.map((game) => (
                 <li key={game.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-line px-3 py-2">
                   <p>
                     {game.whiteName} <span className="text-muted">vs</span> {game.blackName}
-                    <span className="text-muted"> · {game.status === "playing" ? "đang chơi" : resultLabel(game.result, game.reason)}</span>
+                    <span className="text-muted"> · {game.status === "playing" ? t("playingNow") : formatResult(t, game.result, game.reason)}</span>
                   </p>
                   <Link to="/match/$id" params={{ id: game.id }} className="btn">
-                    {game.status === "playing" ? "Tiếp tục" : "Xem lại"}
+                    {game.status === "playing" ? t("continueGame") : t("reviewGame")}
                   </Link>
                 </li>
               ))}
@@ -208,15 +211,15 @@ export function HallView() {
           <div className="grid gap-4 lg:grid-cols-2">
             <section className="panel p-4">
               <h2 className="flex items-center gap-2 text-xl">
-                <Swords size={18} /> Đang online
+                <Swords size={18} /> {t("onlineTitle")}
               </h2>
               <ul className="mt-3 space-y-2">
-                {snap.online.length === 0 && <li className="text-sm text-muted">Chỉ có mình bạn. Gửi mã bạn bè để rủ người khác.</li>}
+                {snap.online.length === 0 && <li className="text-sm text-muted">{t("alone")}</li>}
                 {snap.online.map((person) => (
                   <li key={person.userId} className="flex items-center justify-between gap-2">
                     <p>
                       {person.displayName}
-                      <span className="text-muted"> · {relationLabel(person.relation)}</span>
+                      <span className="text-muted"> · {relationLabel(t, person.relation)}</span>
                     </p>
                     <button
                       type="button"
@@ -224,7 +227,7 @@ export function HallView() {
                       disabled={busy}
                       onClick={() => void act(() => challengePlayer({ data: { toId: person.userId, color } }))}
                     >
-                      Thách đấu
+                      {t("challenge")}
                     </button>
                   </li>
                 ))}
@@ -232,7 +235,7 @@ export function HallView() {
             </section>
             <section className="panel p-4">
               <h2 className="flex items-center gap-2 text-xl">
-                <UserPlus size={18} /> Bạn bè
+                <UserPlus size={18} /> {t("friendsTitle")}
               </h2>
               <form
                 className="mt-3 flex gap-2"
@@ -241,33 +244,33 @@ export function HallView() {
                   void act(() => addFriend({ data: code })).then(() => setCode(""));
                 }}
               >
-                <input className="field" placeholder="Nhập mã bạn bè" value={code} onChange={(event) => setCode(event.target.value.toUpperCase())} />
+                <input className="field" placeholder={t("codePh")} value={code} onChange={(event) => setCode(event.target.value.toUpperCase())} />
                 <button type="submit" className="btn btn-gold" disabled={busy}>
-                  Kết bạn
+                  {t("addFriend")}
                 </button>
               </form>
               <ul className="mt-3 space-y-2">
-                {snap.friends.length === 0 && <li className="text-sm text-muted">Chưa có bạn. Đổi mã với người chơi khác.</li>}
+                {snap.friends.length === 0 && <li className="text-sm text-muted">{t("noFriends")}</li>}
                 {snap.friends.map((friend) => (
                   <li key={friend.friendshipId} className="flex flex-wrap items-center justify-between gap-2">
                     <p>
                       {friend.displayName}
-                      <span className="text-muted"> · {friend.status === "accepted" ? (friend.online ? "online" : "offline") : friend.incoming ? "muốn kết bạn" : "đã gửi lời mời"}</span>
+                      <span className="text-muted"> · {friend.status === "accepted" ? (friend.online ? t("wordOnline") : t("wordOffline")) : friend.incoming ? t("relIncoming") : t("sentInvite")}</span>
                     </p>
                     <div className="flex gap-2">
                       {friend.incoming && (
                         <>
                           <button type="button" className="btn" disabled={busy} onClick={() => void act(() => respondFriend({ data: { friendshipId: friend.friendshipId, accept: true } }))}>
-                            Nhận
+                            {t("accept")}
                           </button>
                           <button type="button" className="btn" disabled={busy} onClick={() => void act(() => respondFriend({ data: { friendshipId: friend.friendshipId, accept: false } }))}>
-                            Từ chối
+                            {t("decline")}
                           </button>
                         </>
                       )}
                       {friend.status === "accepted" && (
                         <button type="button" className="btn" disabled={busy} onClick={() => void act(() => challengePlayer({ data: { toId: friend.userId, color } }))}>
-                          Thách đấu
+                          {t("challenge")}
                         </button>
                       )}
                     </div>
@@ -279,17 +282,17 @@ export function HallView() {
 
           <section className="panel p-4">
             <h2 className="flex items-center gap-2 text-xl">
-              <Eye size={18} /> Trận đang diễn ra
+              <Eye size={18} /> {t("liveTitle")}
             </h2>
             <ul className="mt-3 space-y-2">
-              {snap.liveGames.length === 0 && <li className="text-sm text-muted">Chưa có trận nào để xem. Khi có người đấu, bàn cờ sẽ hiện ở đây.</li>}
+              {snap.liveGames.length === 0 && <li className="text-sm text-muted">{t("noLive")}</li>}
               {snap.liveGames.map((game) => (
                 <li key={game.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-line px-3 py-2">
                   <p>
                     {game.whiteName} <span className="text-muted">vs</span> {game.blackName}
                   </p>
                   <Link to="/match/$id" params={{ id: game.id }} className="btn">
-                    Xem
+                    {t("watch")}
                   </Link>
                 </li>
               ))}
@@ -301,9 +304,9 @@ export function HallView() {
   );
 }
 
-function relationLabel(relation: string): string {
-  if (relation === "friend") return "bạn bè";
-  if (relation === "incoming") return "muốn kết bạn";
-  if (relation === "outgoing") return "đã mời";
-  return "khách";
+function relationLabel(t: (key: "relFriend" | "relIncoming" | "relOutgoing" | "relGuest") => string, relation: string): string {
+  if (relation === "friend") return t("relFriend");
+  if (relation === "incoming") return t("relIncoming");
+  if (relation === "outgoing") return t("relOutgoing");
+  return t("relGuest");
 }

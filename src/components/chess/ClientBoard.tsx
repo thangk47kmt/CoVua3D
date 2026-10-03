@@ -1,14 +1,16 @@
 import { useEffect, useState, type ComponentType } from "react";
 import type { ChessBoardProps } from "./ChessBoard";
+import { useT } from "@/i18n";
 
 export type { ChessBoardProps, LegalDot } from "./ChessBoard";
 
 export function BoardSplash() {
+  const { t } = useT();
   return (
     <div className="board-splash" role="status" aria-live="polite">
       <div className="board-splash-card">
         <p className="board-splash-kicker">Celestial Crystal</p>
-        <p className="board-splash-title">Đang dựng bàn cờ</p>
+        <p className="board-splash-title">{t("buildingBoard")}</p>
         <span className="board-splash-bar" aria-hidden="true" />
       </div>
     </div>

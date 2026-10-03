@@ -2,12 +2,14 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Chess } from "chess.js";
 import { ClientBoard } from "@/components/chess/ClientBoard";
 import { MatchChrome, MoveHelper, PromotionDialog, SoundButton } from "@/components/chess/MatchChrome";
+import { LanguageButton } from "@/components/chess/LanguagePicker";
 import { playFx, unlockAudio } from "@/game/audio";
 import { search, type EngineMove } from "@/game/engine";
 import { levelById } from "@/game/levels";
-import { animFromMove, pieceName, type BoardAnim } from "@/game/notation";
+import { animFromMove, type BoardAnim } from "@/game/notation";
 import { asSquare, kingSquare, outcome } from "@/game/rules";
 import { writeSave } from "@/game/save";
+import { formatStatus, getLang, levelName, pieceLabel, translate, useT } from "@/i18n";
 
 type Phase = "idle" | "animating" | "promote" | "over";
 
@@ -23,6 +25,8 @@ export function BotMatch({
   onRestart: () => void;
 }) {
   const level = levelById(levelId);
+  const { t } = useT();
+  const levelTitle = levelName(t, level.id);
   const chessRef = useRef<Chess | null>(null);
   if (!chessRef.current) {
     const chess = new Chess();
@@ -101,7 +105,7 @@ export function BotMatch({
       if (req.current !== id) return;
       req.current += 1;
       try {
-        const move = search(fen, Math.min(level.movetime, 320), level.noise, Math.min(level.depthCap, 2));
+        const move = search(fen, 40, level.noise, 1);
         if (move) applyRef.current(move.from, move.to, move.promotion);
         else setWaiting(false);
       } catch {
@@ -126,10 +130,10 @@ export function BotMatch({
         if (event.data.id !== -hintId.current) return;
         const move = event.data.move;
         if (!move) {
-          setHint("Không có nước gợi ý.");
+          setHint(translate(getLang(), "hintNone"));
           return;
         }
-        setHint(`Gợi ý: ${move.san}. Chạm quân rồi đi nước đó.`);
+        setHint(translate(getLang(), "hintSan", { san: move.san }));
         setSelected(move.from);
         return;
       }
@@ -238,7 +242,7 @@ export function BotMatch({
     const worker = workerRef.current;
     if (!chess || !worker || phase !== "idle" || chess.turn() !== playerColor || chess.isGameOver()) return;
     const id = ++hintId.current;
-    setHint("Đang chọn nước gợi ý…");
+    setHint(translate(getLang(), "hintWait"));
     worker.postMessage({ id: -id, fen: chess.fen(), movetime: 180, noise: 0, depthCap: 2 });
   }
 
@@ -278,28 +282,29 @@ export function BotMatch({
     : !selected
       ? uniqueOrigins(live, playerColor).map((move) => ({
           id: move.from,
-          label: `${pieceName(move.piece)} ${move.from}`,
+          label: `${pieceLabel(t, move.piece)} ${move.from}`,
           onClick: () => onSquare(move.from),
         }))
       : legal.map((dot) => ({
           id: dot.to,
-          label: dot.capture ? `Bắt ${dot.to}` : dot.to,
+          label: dot.capture ? t("captureSq", { sq: dot.to }) : dot.to,
           onClick: () => onSquare(dot.to),
         }));
 
-  const status = manual ?? (waiting ? "Tinh tú đang nghĩ…" : (hint ?? liveReport.text));
+  const status = manual ?? (waiting ? t("thinking") : (hint ?? formatStatus(t, liveReport, live.turn())));
 
   return (
     <div className="grid h-dvh min-w-0 grid-cols-[minmax(0,1fr)] grid-rows-[auto_minmax(0,1fr)_auto] overflow-hidden lg:grid-cols-[minmax(0,1fr)_22rem] lg:grid-rows-[auto_minmax(0,1fr)]">
       <header className="flex items-center justify-between gap-3 border-b border-line px-4 py-3 lg:col-span-2">
         <div>
           <p className="text-xs tracking-[0.2em] text-gold uppercase">Celestial Crystal</p>
-          <h1 className="text-xl">{level.name}</h1>
+          <h1 className="text-xl">{levelTitle}</h1>
         </div>
         <div className="flex items-center gap-2">
           <button type="button" className="btn" onClick={onRestart}>
-            Ván mới
+            {t("newGame")}
           </button>
+          <LanguageButton />
           <SoundButton />
         </div>
       </header>
@@ -322,8 +327,8 @@ export function BotMatch({
         {confirmResign && (
           <div className="absolute inset-0 z-20 grid place-items-center bg-bg/70 p-4">
             <div className="panel w-full max-w-sm p-4">
-              <h2 className="text-xl">Xin thua?</h2>
-              <p className="mt-1 text-sm text-muted">Ván với {level.name} sẽ kết thúc.</p>
+              <h2 className="text-xl">{t("resignTitle")}</h2>
+              <p className="mt-1 text-sm text-muted">{t("resignBot", { name: levelTitle })}</p>
               <div className="mt-3 flex gap-2">
                 <button
                   type="button"
@@ -332,15 +337,15 @@ export function BotMatch({
                     req.current += 1;
                     setConfirmResign(false);
                     setWaiting(false);
-                    setManual(playerColor === "w" ? "Bạn xin thua — Đen thắng" : "Bạn xin thua — Trắng thắng");
+                    setManual(playerColor === "w" ? t("resignedWhite") : t("resignedBlack"));
                     setPhase("over");
                     playFx("end");
                   }}
                 >
-                  Xin thua
+                  {t("resignConfirm")}
                 </button>
                 <button type="button" className="btn btn-gold flex-1" onClick={() => setConfirmResign(false)}>
-                  Chơi tiếp
+                  {t("keepPlaying")}
                 </button>
               </div>
             </div>
@@ -348,10 +353,10 @@ export function BotMatch({
         )}
       </div>
       <MatchChrome
-        kicker={playerColor === "w" ? "Bạn cầm Trắng" : "Bạn cầm Đen"}
+        kicker={playerColor === "w" ? t("youHoldWhite") : t("youHoldBlack")}
         status={status}
-        whiteName={playerColor === "w" ? "Bạn" : level.name}
-        blackName={playerColor === "b" ? "Bạn" : level.name}
+        whiteName={playerColor === "w" ? t("you") : levelTitle}
+        blackName={playerColor === "b" ? t("you") : levelTitle}
         turn={manual || live.isGameOver() ? null : live.turn()}
         fen={shown}
         sans={sans}

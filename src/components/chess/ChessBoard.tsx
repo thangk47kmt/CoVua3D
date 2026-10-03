@@ -1,7 +1,8 @@
 import { Suspense, useEffect, useLayoutEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import { BoardSplash } from "./ClientBoard";
+import { useT } from "@/i18n";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
-import { OrbitControls, Billboard } from "@react-three/drei";
+import { OrbitControls, Billboard, PerformanceMonitor } from "@react-three/drei";
 import { Chess } from "chess.js";
 import {
   AdditiveBlending,
@@ -1222,6 +1223,7 @@ function Scene(
 }
 
 export function ChessBoard(props: ChessBoardProps) {
+  const { t } = useT();
   const cam = useRef<CamApi>({
     zoom() {},
     pan() {},
@@ -1241,6 +1243,7 @@ export function ChessBoard(props: ChessBoardProps) {
     window.addEventListener("celestial-theme", read);
     return () => window.removeEventListener("celestial-theme", read);
   }, []);
+  const [dpr, setDpr] = useState(1.25);
   const theme = applyTint(themeById(themeId), tint);
   const [ready, setReady] = useState(false);
   const [awake, setAwake] = useState(true);
@@ -1264,14 +1267,21 @@ export function ChessBoard(props: ChessBoardProps) {
     };
   }, []);
   return (
-    <div ref={hostRef} className="crystal-host" aria-label="Bàn cờ pha lê" aria-busy={!ready}>
+    <div ref={hostRef} className="crystal-host" aria-label={t("boardLabel")} aria-busy={!ready}>
       <div className="absolute inset-0">
         <Canvas
           camera={{ position: [0, 10.2, 9.9], fov: 30, near: 0.08, far: 220 }}
-          dpr={[1, 1.5]}
+          dpr={dpr}
+          frameloop={awake ? "always" : "never"}
           gl={{ antialias: true, alpha: false, powerPreference: "high-performance", stencil: false }}
           style={{ width: "100%", height: "100%", touchAction: "none" }}
         >
+          <PerformanceMonitor
+            flipflops={2}
+            onDecline={() => setDpr(1)}
+            onIncline={() => setDpr(1.25)}
+            onFallback={() => setDpr(1)}
+          />
           <Suspense fallback={null}>
             <Scene {...props} cam={cam} aim={aim} theme={theme} selectedRef={selectedRef} flippedRef={flippedRef} onReady={markReady} awake={awake} />
           </Suspense>
@@ -1284,6 +1294,7 @@ export function ChessBoard(props: ChessBoardProps) {
 }
 
 function CameraPad({ cam }: { cam: { current: CamApi } }) {
+  const { t } = useT();
   const timer = useRef<number | null>(null);
   const stop = () => {
     if (timer.current !== null) {
@@ -1304,30 +1315,30 @@ function CameraPad({ cam }: { cam: { current: CamApi } }) {
     <div className="absolute top-2 right-2 z-10 flex flex-col items-end gap-1">
       <div className="grid grid-cols-3 gap-1" onPointerUp={stop} onPointerCancel={stop} onPointerLeave={stop}>
         <span />
-        <button type="button" className={key} aria-label="Đưa camera lên" onPointerDown={(event) => hold(event, "up")}>
+        <button type="button" className={key} aria-label={t("camUp")} onPointerDown={(event) => hold(event, "up")}>
           ↑
         </button>
         <span />
-        <button type="button" className={key} aria-label="Đưa camera sang trái" onPointerDown={(event) => hold(event, "left")}>
+        <button type="button" className={key} aria-label={t("camLeft")} onPointerDown={(event) => hold(event, "left")}>
           ←
         </button>
-        <button type="button" className={key} aria-label="Camera về giữa bàn cờ" onClick={() => cam.current.reset()}>
+        <button type="button" className={key} aria-label={t("camCenter")} onClick={() => cam.current.reset()}>
           ■
         </button>
-        <button type="button" className={key} aria-label="Đưa camera sang phải" onPointerDown={(event) => hold(event, "right")}>
+        <button type="button" className={key} aria-label={t("camRight")} onPointerDown={(event) => hold(event, "right")}>
           →
         </button>
         <span />
-        <button type="button" className={key} aria-label="Đưa camera xuống" onPointerDown={(event) => hold(event, "down")}>
+        <button type="button" className={key} aria-label={t("camDown")} onPointerDown={(event) => hold(event, "down")}>
           ↓
         </button>
         <span />
       </div>
       <div className="flex gap-1">
-        <button type="button" className={key} onClick={() => cam.current.zoom("in")} aria-label="Phóng gần">
+        <button type="button" className={key} onClick={() => cam.current.zoom("in")} aria-label={t("zoomIn")}>
           +
         </button>
-        <button type="button" className={key} onClick={() => cam.current.zoom("out")} aria-label="Thu xa">
+        <button type="button" className={key} onClick={() => cam.current.zoom("out")} aria-label={t("zoomOut")}>
           −
         </button>
       </div>

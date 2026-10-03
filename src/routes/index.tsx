@@ -3,10 +3,12 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { DEFAULT_POSITION } from "chess.js";
 import { ClientBoard } from "@/components/chess/ClientBoard";
 import { SoundButton } from "@/components/chess/MatchChrome";
+import { LanguageButton } from "@/components/chess/LanguagePicker";
 import { ThemePicker } from "@/components/chess/ThemePicker";
 import { unlockAudio } from "@/game/audio";
 import { LEVELS } from "@/game/levels";
 import { readSave } from "@/game/save";
+import { levelBlurb, levelName, useT } from "@/i18n";
 
 export const Route = createFileRoute("/")({
   component: Home,
@@ -14,6 +16,7 @@ export const Route = createFileRoute("/")({
 
 function Home() {
   const navigate = useNavigate();
+  const { t } = useT();
   const [level, setLevel] = useState(3);
   const [color, setColor] = useState<"w" | "b" | "r">("w");
   const [saved, setSaved] = useState(false);
@@ -46,11 +49,12 @@ function Home() {
           <div>
             <p className="text-xs tracking-[0.28em] text-gold uppercase">Chess set</p>
             <h1 className="text-4xl text-fg sm:text-5xl">Celestial Crystal</h1>
-            <p className="max-w-md text-sm text-muted">Vương quốc của những vì sao, mãi trong tay bạn.</p>
+            <p className="max-w-md text-sm text-muted">{t("tagline")}</p>
           </div>
           <div className="flex gap-2">
+            <LanguageButton />
             <Link to="/hall" className="btn">
-              Sảnh
+              {t("hall")}
             </Link>
             <SoundButton />
           </div>
@@ -58,21 +62,21 @@ function Home() {
         <div className="flex-1" />
         <section className="pointer-events-auto panel mx-3 mb-3 max-h-[58dvh] overflow-y-auto p-4 sm:mx-auto sm:w-full sm:max-w-3xl lg:absolute lg:top-24 lg:right-4 lg:bottom-4 lg:mx-0 lg:mb-0 lg:w-80 lg:max-w-none">
           <ThemePicker />
-          <p className="mt-3 text-xs tracking-[0.16em] text-muted uppercase">Độ khó của tinh tú</p>
+          <p className="mt-3 text-xs tracking-[0.16em] text-muted uppercase">{t("difficulty")}</p>
           <div className="mt-2 flex gap-2 overflow-x-auto pb-1">
             {LEVELS.map((item) => (
               <button key={item.id} type="button" className="chip shrink-0" data-on={level === item.id} onClick={() => setLevel(item.id)}>
-                {item.name}
+                {levelName(t, item.id)}
               </button>
             ))}
           </div>
-          <p className="mt-2 text-sm text-muted">{chosen.blurb}</p>
+          <p className="mt-2 text-sm text-muted">{levelBlurb(t, chosen.id)}</p>
           <div className="mt-3 flex flex-wrap gap-2">
             {(
               [
-                ["w", "Cầm Trắng"],
-                ["b", "Cầm Đen"],
-                ["r", "Ngẫu nhiên"],
+                ["w", t("playWhite")],
+                ["b", t("playBlack")],
+                ["r", t("randomColor")],
               ] as const
             ).map(([value, label]) => (
               <button key={value} type="button" className="chip" data-on={color === value} onClick={() => setColor(value)}>
@@ -89,7 +93,7 @@ function Home() {
                 void navigate({ to: "/play", search: { level, color, resume: false } });
               }}
             >
-              Bắt đầu ván đấu
+              {t("startMatch")}
             </button>
             {saved && (
               <button
@@ -100,26 +104,20 @@ function Home() {
                   void navigate({ to: "/play", search: { level, color, resume: true } });
                 }}
               >
-                Tiếp tục ván dở
+                {t("resumeMatch")}
               </button>
             )}
             <Link to="/learn" className="btn" onClick={() => unlockAudio()}>
-              Tập chơi
+              {t("practice")}
             </Link>
             <Link to="/hall" className="btn" onClick={() => unlockAudio()}>
-              Vào sảnh thách đấu
+              {t("challengeHall")}
             </Link>
           </div>
           <details className="mt-3 text-sm text-muted">
-            <summary className="cursor-pointer text-fg">Luật chơi và cách điều khiển</summary>
-            <p className="mt-2">
-              Đúng luật cờ vua: chiếu, chiếu hết, pat, nhập thành, bắt tốt qua đường, phong cấp, hòa khi lặp thế cờ,
-              luật 50 nước và khi không đủ lực chiếu hết. Pat là hòa, không phải thắng.
-            </p>
-            <p className="mt-2">
-              Chạm một quân, rồi chạm ô sáng để đi. Kéo để xoay. Nút + và cuộn chuột phóng vào ô đang chọn,
-              hoặc vào chỗ con trỏ nếu chưa chọn quân. − thu ra, Góc trả về toàn bàn.
-            </p>
+            <summary className="cursor-pointer text-fg">{t("rulesSummary")}</summary>
+            <p className="mt-2">{t("rulesP1")}</p>
+            <p className="mt-2">{t("rulesP2")}</p>
           </details>
         </section>
       </div>

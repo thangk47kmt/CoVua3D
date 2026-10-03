@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { BotMatch } from "@/components/game/BotMatch";
 import { clearSave, readSave } from "@/game/save";
+import { useT } from "@/i18n";
 
 type PlaySearch = { level: number; color: "w" | "b" | "r"; resume: boolean };
 
@@ -20,6 +21,7 @@ export const Route = createFileRoute("/play")({
 
 function PlayPage() {
   const search = Route.useSearch();
+  const { t } = useT();
   const [setup, setSetup] = useState<null | { level: number; color: "w" | "b"; sans: string[]; nonce: number }>(null);
 
   useEffect(() => {
@@ -35,7 +37,7 @@ function PlayPage() {
   }, [search.color, search.level, search.resume]);
 
   if (!setup) {
-    return <div className="grid h-dvh place-items-center text-muted">Đang xếp quân…</div>;
+    return <div className="grid h-dvh place-items-center text-muted">{t("settingUp")}</div>;
   }
 
   return (

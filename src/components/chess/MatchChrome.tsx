@@ -16,6 +16,7 @@ import {
 import { capturedSets, moveRows } from "@/game/notation";
 import { srcForGlyph, srcForPiece, usePieceSet } from "./pieceArt";
 import { ThemePicker } from "./ThemePicker";
+import { useT } from "@/i18n";
 
 export function SoundButton() {
   const muted = useSyncExternalStore(subscribeMute, isMuted, () => false);
@@ -35,13 +36,14 @@ export function SoundButton() {
     return () => window.removeEventListener("pointerdown", close);
   }, [open]);
   const silent = muted || (music <= 0.001 && sfx <= 0.001);
+  const { t } = useT();
   return (
     <div className="relative" ref={box}>
       <button
         type="button"
         className="btn btn-ghost min-w-11 px-3"
         aria-expanded={open}
-        aria-label="Chỉnh âm lượng"
+        aria-label={t("volume")}
         onClick={() => {
           unlockAudio();
           setOpen((value) => !value);
@@ -52,7 +54,7 @@ export function SoundButton() {
       {open && (
         <div className="absolute top-full right-0 z-40 mt-2 w-56 rounded-xl border border-line bg-[#100c18]/95 p-3 text-left shadow-lg backdrop-blur">
           <label className="block text-xs tracking-[0.14em] text-muted uppercase">
-            Nhạc nền
+            {t("music")}
             <input
               className="vol-slider mt-1"
               type="range"
@@ -68,7 +70,7 @@ export function SoundButton() {
             />
           </label>
           <label className="mt-3 block text-xs tracking-[0.14em] text-muted uppercase">
-            Hiệu ứng
+            {t("sfx")}
             <input
               className="vol-slider mt-1"
               type="range"
@@ -91,7 +93,7 @@ export function SoundButton() {
               setMuted(!muted);
             }}
           >
-            {muted ? "Bật tiếng" : "Tắt hết"}
+            {muted ? t("soundOn") : t("soundOff")}
           </button>
         </div>
       )}
@@ -149,6 +151,7 @@ export function MatchChrome({
   const diff =
     caps.diff === 0 ? "" : caps.diff > 0 ? `+${caps.diff}` : `${caps.diff}`;
   const [open, setOpen] = useState(false);
+  const { t } = useT();
   useEffect(() => {
     const query = window.matchMedia("(min-width: 1024px)");
     const apply = () => setOpen(query.matches);
@@ -156,7 +159,7 @@ export function MatchChrome({
     query.addEventListener("change", apply);
     return () => query.removeEventListener("change", apply);
   }, []);
-  const label = thinking ? "Tinh tú đang nghĩ…" : status;
+  const label = thinking ? t("thinking") : status;
   return (
     <aside className="panel flex min-h-0 max-h-[46dvh] flex-col gap-3 overflow-y-auto p-3 lg:max-h-none">
       <button
@@ -165,11 +168,11 @@ export function MatchChrome({
         aria-expanded={open}
         onClick={() => setOpen((value) => !value)}
       >
-        {open ? "Thu thiết lập" : `Thiết lập · ${label}`}
+        {open ? t("settingsOpen") : t("settingsClose", { status: label })}
       </button>
       <div className="max-h-28 min-h-0 overflow-y-auto rounded-lg border border-line">
         {rows.length === 0 ? (
-          <p className="p-3 text-sm text-muted">Chưa có nước đi.</p>
+          <p className="p-3 text-sm text-muted">{t("noMoves")}</p>
         ) : (
           <ol className="divide-y divide-line">
             {rows.map((row) => (
@@ -185,17 +188,17 @@ export function MatchChrome({
       <div className={`grid gap-2 ${onPlayNow ? "grid-cols-3" : "grid-cols-2"}`}>
         {onHint && (
           <button type="button" className="btn" onClick={onHint} disabled={thinking}>
-            Gợi ý
+            {t("hint")}
           </button>
         )}
         {onUndo && (
           <button type="button" className="btn" onClick={onUndo}>
-            <Undo2 size={16} /> Đi lại
+            <Undo2 size={16} /> {t("undo")}
           </button>
         )}
         {onPlayNow && (
           <button type="button" className={`btn btn-gold ${thinking ? "" : "invisible"}`} disabled={!thinking} onClick={onPlayNow}>
-            Đi ngay
+            {t("goNow")}
           </button>
         )}
       </div>
@@ -206,13 +209,13 @@ export function MatchChrome({
           <p className="text-xs tracking-[0.18em] text-gold uppercase">{kicker}</p>
           <p className="mt-1 text-lg text-fg">{label}</p>
         </div>
-        <Link to="/" className="btn btn-ghost px-3" aria-label="Về sảnh chính">
+        <Link to="/" className="btn btn-ghost px-3" aria-label={t("home")}>
           <ArrowLeft size={18} />
         </Link>
       </div>
       <ThemePicker />
-      <PlayerLine name={blackName} side="Đen" active={turn === "b"} caps={caps.byBlack} score={caps.diff < 0 ? `+${-caps.diff}` : ""} />
-      <PlayerLine name={whiteName} side="Trắng" active={turn === "w"} caps={caps.byWhite} score={diff && caps.diff > 0 ? diff : ""} />
+      <PlayerLine name={blackName} side={t("black")} active={turn === "b"} caps={caps.byBlack} score={caps.diff < 0 ? `+${-caps.diff}` : ""} />
+      <PlayerLine name={whiteName} side={t("white")} active={turn === "w"} caps={caps.byWhite} score={diff && caps.diff > 0 ? diff : ""} />
       {error && <p className="text-sm text-danger">{error}</p>}
       {drawHint && (
         <div className="rounded-lg border border-line p-3">
@@ -220,10 +223,10 @@ export function MatchChrome({
           {onAcceptDraw && onDeclineDraw && (
             <div className="mt-2 flex gap-2">
               <button type="button" className="btn btn-gold flex-1" onClick={onAcceptDraw}>
-                Nhận hòa
+                {t("acceptDraw")}
               </button>
               <button type="button" className="btn flex-1" onClick={onDeclineDraw}>
-                Từ chối
+                {t("declineDraw")}
               </button>
             </div>
           )}
@@ -232,16 +235,16 @@ export function MatchChrome({
       {children}
       <div className="grid grid-cols-2 gap-2">
         <button type="button" className="btn" onClick={onFlip}>
-          <RotateCw size={16} /> Xoay bàn
+          <RotateCw size={16} /> {t("flip")}
         </button>
         {onOfferDraw && (
           <button type="button" className="btn" onClick={onOfferDraw}>
-            <Handshake size={16} /> Xin hòa
+            <Handshake size={16} /> {t("offerDraw")}
           </button>
         )}
         {onResign && (
           <button type="button" className="btn" onClick={onResign}>
-            <Flag size={16} /> Xin thua
+            <Flag size={16} /> {t("resign")}
           </button>
         )}
       </div>
@@ -320,17 +323,18 @@ export function PromotionDialog({
   onChoose: (piece: "q" | "r" | "b" | "n") => void;
 }) {
   const pieces = usePieceSet();
+  const { t } = useT();
   const choices = [
-    ["q", "Hậu"],
-    ["r", "Xe"],
-    ["b", "Tượng"],
-    ["n", "Mã"],
+    ["q", t("queen")],
+    ["r", t("rook")],
+    ["b", t("bishop")],
+    ["n", t("knight")],
   ] as const;
   return (
     <div className="absolute inset-0 z-20 grid place-items-center bg-bg/70 p-4">
       <div className="panel w-full max-w-sm p-4">
-        <h2 className="text-xl">Phong cấp</h2>
-        <p className="mt-1 text-sm text-muted">Tốt đã tới hàng cuối. Chọn quân mới.</p>
+        <h2 className="text-xl">{t("promoteTitle")}</h2>
+        <p className="mt-1 text-sm text-muted">{t("promoteHelp")}</p>
         <div className="mt-3 grid grid-cols-2 gap-2">
           {choices.map(([piece, label]) => (
             <button key={piece} type="button" className="btn" onClick={() => { unlockAudio(); playFx("promote", piece); onChoose(piece); }}>
@@ -348,10 +352,11 @@ export function MoveHelper({
 }: {
   buttons: { id: string; label: string; onClick: () => void }[];
 }) {
+  const { t } = useT();
   if (buttons.length === 0) return null;
   return (
     <div>
-      <p className="mb-2 text-xs tracking-[0.14em] text-muted uppercase">Nước đi</p>
+      <p className="mb-2 text-xs tracking-[0.14em] text-muted uppercase">{t("moves")}</p>
       <div className="flex max-h-28 flex-wrap gap-2 overflow-y-auto">
         {buttons.map((button) => (
           <button key={button.id} type="button" className="chip" onClick={button.onClick}>
